@@ -7,6 +7,7 @@
 galaxy_start_workflow(
   dataset_id,
   workflow_id,
+  history_id = NA,
   galaxy_url = "https://usegalaxy.eu"
 )
 }
@@ -14,6 +15,8 @@ galaxy_start_workflow(
 \item{dataset_id}{The ID of the input dataset in Galaxy}
 
 \item{workflow_id}{The ID of the workflow to run}
+
+\item{history_id}{The ID of the history where the workflow will run}
 
 \item{galaxy_url}{Base URL of the Galaxy instance}
 }

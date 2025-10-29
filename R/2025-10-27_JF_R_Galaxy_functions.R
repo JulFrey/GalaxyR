@@ -101,16 +101,22 @@ galaxy_upload <- function(input_file, history_id, galaxy_url = "https://usegalax
 #' @param dataset_id The ID of the input dataset in Galaxy
 #' @param workflow_id The ID of the workflow to run
 #' @param galaxy_url Base URL of the Galaxy instance
+#' @param history_id The ID of the history where the workflow will run
 #'
 #' @returns invocation_id The ID of the started workflow invocation
 #' @export galaxy_start_workflow
 #'
-galaxy_start_workflow <- function(dataset_id, workflow_id, galaxy_url = "https://usegalaxy.eu"){
+galaxy_start_workflow <- function(dataset_id, workflow_id, history_id = NA, galaxy_url = "https://usegalaxy.eu"){
   api_key <- Sys.getenv("GALAXY_API_KEY")
   run_url <- paste0(galaxy_url, "/api/workflows/", workflow_id, "/invocations")
   run_body <- list(
     inputs = setNames(list(list(src = "hda", id = dataset_id)), "0")  # map input 0
   )
+
+  # include history id in payload so the workflow runs into the specified history
+  if(!is.na(history_id)){
+    run_body$history_id <- history_id
+  }
 
   run_res <- httr::POST(
     run_url,
@@ -135,6 +141,7 @@ galaxy_start_workflow <- function(dataset_id, workflow_id, galaxy_url = "https:/
 #' @export galaxy_poll_workflow
 galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.eu", poll_interval = 30) {
   api_key <- Sys.getenv("GALAXY_API_KEY")
+  any_error <- FALSE
   repeat {
     Sys.sleep(poll_interval)
 
@@ -173,8 +180,9 @@ galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.
       message("All jobs finished successfully!")
       break
     }
-    if (any(job_states == "error" | job_states == "failed")) {
-      message("Some workflow jobs failed.")
+    if (any(job_states == "error" | job_states == "failed" | job_states == "deleted")) {
+      any_error <- TRUE
+      message("Some workflow jobs failed or were cancelled.")
       break
     }
   }
@@ -189,8 +197,9 @@ galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.
 
   output_ids <- sapply(datasets, function(d) if(d$state == "ok" && !isTRUE(d$deleted)) d$id else NULL)
   output_ids <- output_ids[!sapply(output_ids, is.null)]
+  output <- list(success = !any_error, output_ids = output_ids)
 
-  return(output_ids)
+  return(output)
 }
 
 #' Download final result dataset from Galaxy
@@ -202,6 +211,10 @@ galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.
 #' @returns The response object from the download request for debugging
 #' @export galaxy_download_result
 galaxy_download_result <- function(output_ids, out_file = "result.laz", galaxy_url = "https://usegalaxy.eu" ){
+  if(!is.null(output_ids$output_ids)){
+    output_ids <- output_ids$output_ids
+  }
+
   api_key <- Sys.getenv("GALAXY_API_KEY")
   download_res <- httr::GET(
     paste0(galaxy_url, "/api/datasets/", output_ids[length(output_ids)], "/display"),
@@ -300,6 +313,9 @@ galaxy_delete_dataset <- function(dataset_id, purge = TRUE, verbose = FALSE, gal
 #'
 #' @export galaxy_delete_datasets
 galaxy_delete_datasets <- function(output_ids, purge = TRUE, sleep = 0.2, galaxy_url = "https://usegalaxy.eu") {
+  if(!is.null(output_ids$output_ids)){
+    output_ids <- output_ids$output_ids
+  }
   if(is.list(output_ids)) output_ids <- unlist(output_ids)
   if (!is.character(output_ids)) {
     stop("output_ids must be a character vector of dataset IDs.")

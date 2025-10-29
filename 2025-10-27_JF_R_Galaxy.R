@@ -2,7 +2,7 @@
 # library(httr)
 # library(jsonlite)
 
-#source("C:/Users/Frey/Desktop/2025-10-27_JF_R_Galaxy_functions.R")
+source("D:/GalaxyR/R/2025-10-27_JF_R_Galaxy_functions.R")
 
 # ---- 0. set your credentials ----
 # edit your ~/.Renviron or C:/Users/<user>/Documents/.Renviron file and add
@@ -11,17 +11,19 @@
 # GALAXY_PASSWORD="passwd"
 
 # ---- CONFIGURATION ----
-workflow_id <- "ca9b55a020b0161b" #SAT + DetailView "0b835e2f3f14627e"
+workflow_id <- "d3bf3b2d7d56619b" # SAT only"ca9b55a020b0161b" #SAT + DetailView "0b835e2f3f14627e"
 input_file <- "C:/TLS/docker/input/2022-02-28 breisach mmes.laz"
 
+#
+# input_file <- "C:/TLS/docker/input/Platane_pcrs.laz"
 # # ---- 1. Get or create a history ----
 # history_id <- galaxy_initialize()
 #
 # # ---- 2. Upload dataset into that history ----
-# dataset_id <- galaxy_upload(input_file)
+# dataset_id <- galaxy_upload(input_file, history_id)
 #
 # # --- 2. Run workflow ---
-# invocation_id <- galaxy_start_workflow(dataset_id, workflow_id)
+# invocation_id <- galaxy_start_workflow(dataset_id, workflow_id, history_id)
 #
 # # --- 3. Poll for completion ---
 # output_ids <- galaxy_poll_workflow(invocation_id, poll_interval = 30)
@@ -30,6 +32,9 @@ input_file <- "C:/TLS/docker/input/2022-02-28 breisach mmes.laz"
 # result_file <- galaxy_download_result(output_ids, "C:/TLS/test.laz")
 
 # LAS Catalog example
+
+library(future)
+future::plan(future::multisession, workers = 23L)
 
 catalog <- lidR::readTLScatalog(input_file)
 lidR::opt_chunk_size(catalog) <- 45
@@ -56,7 +61,6 @@ catalog_function <- function(cluster) {
   # initialize a history
   history_id <- galaxy_initialize(paste0("tile_", tile_id))
 
-
   # upload the file
   dataset_id <- galaxy_upload(tmpfile, history_id)
 
@@ -64,20 +68,24 @@ catalog_function <- function(cluster) {
   file.remove(tmpfile)
 
   # start workflow
-  invocation_id <- galaxy_start_workflow(dataset_id, workflow_id)
+  invocation_id <- galaxy_start_workflow(dataset_id, workflow_id, history_id)
 
   # --- 3. Poll for completion ---
   output_ids <- galaxy_poll_workflow(invocation_id, poll_interval = 30)
+  if(!output_ids$success) return(NULL)
 
   # --- 4. Download result dataset ---
   # new tmp file
   tmpfile <- tempfile(fileext = ".laz")
   result_file <- galaxy_download_result(output_ids, tmpfile)
 
+  # --- 5. clean up on Galaxy ---
+  galaxy_delete_datasets(output_ids)
+
   # read the result
   las <- lidR::readTLS(tmpfile)
   file.remove(tmpfile)
-  if (lidR::is.empty(las) ) return(NULL)
+  if (lidR::is.empty(las)) return(NULL)
 
   # Get the heighest point XY location per PredInstance Id of the las file
   # get the row index of the highest Z per PredInstance
@@ -105,6 +113,5 @@ catalog_function <- function(cluster) {
 }
 
 ctg <- lidR::catalog_apply(catalog, catalog_function)
-# TODO: Solve problem with wrong histories
-# TODO: Remove data automatically from Galaxy
-# TODO: Check with multiple Tiles in parallel
+
+# TODO: Implement a workflow manager which remembers compleated tiles
