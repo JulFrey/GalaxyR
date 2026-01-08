@@ -1,4 +1,4 @@
-## functions to communigate with the galaxy api
+## functions to communicate with the galaxy api
 ## written by Julian Frey
 ## 2025-10-27
 
@@ -502,6 +502,7 @@ galaxy_history_size <- function(history_id,
     sprintf("%.2f %s", b / (1024 ^ idx), units[idx + 1])
   }
 
+
   # 1) Try summary/history endpoint for any disk/size fields
   history_url <- paste0(galaxy_url, "/api/histories/", history_id)
   res <- httr::GET(history_url, httr::add_headers(`x-api-key` = api_key, `Content-Type` = "application/json"))
@@ -565,4 +566,530 @@ galaxy_history_size <- function(history_id,
              bytes = as.numeric(total_bytes),
              human_size = human_bytes(total_bytes),
              stringsAsFactors = FALSE)
+}
+
+
+#' Set the Galaxy API key for the current R session
+#'
+#' @param api_key Character. The API key to be used for authenticating
+#'   subsequent Galaxy API calls.
+#' @param overwrite Logical. Whether to overwrite an existing value in
+#'   \code{Sys.getenv("GALAXY_API_KEY")}. Default: \code{TRUE}.
+#'
+#' @return Invisibly returns the API key that was set.
+#'
+#' @details
+#' This helper is intended for interactive sessions. It simply calls
+#' \code{Sys.setenv(GALAXY_API_KEY = api_key)}.
+#'
+#' @examples
+#' \dontrun{
+#' galaxy_set_api_key("your-secret-key")
+#' }
+#'
+#' @export
+galaxy_set_api_key <- function(api_key, overwrite = TRUE) {
+  if (missing(api_key) || !nzchar(api_key)) {
+    stop("api_key must be a non-empty string.")
+  }
+  existing <- Sys.getenv("GALAXY_API_KEY", unset = NA_character_)
+  if (!isTRUE(overwrite) && !is.na(existing) && nzchar(existing)) {
+    stop("GALAXY_API_KEY already set; use overwrite = TRUE to replace.")
+  }
+  Sys.setenv(GALAXY_API_KEY = api_key)
+  invisible(api_key)
+}
+
+#' List tools installed on a Galaxy instance
+#'
+#' @param galaxy_url Character. Base URL of the Galaxy instance.
+#'   Default: \code{"https://usegalaxy.eu"}.
+#' @param in_panel Logical. If \code{TRUE}, return the tool panel
+#'   structure (sections/categories). If \code{FALSE}, return the flat
+#'   list of all tools as supplied by Galaxy. Default: \code{FALSE}.
+#' @param panel_id Optional character. When supplied, only tools from the
+#'   matching panel (section/category) are returned. The value is matched
+#'   against both the panel \code{id} and \code{name}. Supplying
+#'   \code{panel_id} automatically requests the panelized structure,
+#'   regardless of the value of \code{in_panel}.
+#'
+#' @return A list corresponding to the parsed JSON returned by Galaxy.
+#'   If \code{panel_id} is provided, a list of tool entries belonging to
+#'   the requested panel is returned (each entry is the raw tool metadata
+#'   as provided by Galaxy).
+#'
+#' @examples
+#' \dontrun{
+#' # All tools (flat list)
+#' galaxy_list_tools()
+#'
+#' # Panel structure
+#' galaxy_list_tools(in_panel = TRUE)
+#'
+#' # Tools from a specific panel (match by id or name)
+#' galaxy_list_tools(panel_id = "get-data")
+#' galaxy_list_tools(panel_id = "Get Data")
+#' }
+#'
+#' @export
+galaxy_list_tools <- function(galaxy_url = "https://usegalaxy.eu",
+                              in_panel = FALSE,
+                              panel_id = NULL) {
+  if (!requireNamespace("httr", quietly = TRUE) ||
+      !requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Packages 'httr' and 'jsonlite' are required.")
+  }
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  request_panel <- isTRUE(in_panel) || !is.null(panel_id)
+
+  res <- httr::GET(
+    url = paste0(galaxy_url, "/api/tools"),
+    httr::add_headers(`x-api-key` = api_key),
+    query = list(in_panel = if (request_panel) "true" else "false")
+  )
+  httr::stop_for_status(res)
+  content <- httr::content(res, as = "parsed", simplifyVector = FALSE)
+
+  if (is.null(panel_id)) {
+    return(content)
+  }
+
+  find_panel <- function(items) {
+    for (item in items) {
+      if (!is.list(item)) next
+      # match by id or name
+      if (!is.null(item$id) && identical(item$id, panel_id)) return(item)
+      if (!is.null(item$name) && identical(item$name, panel_id)) return(item)
+      # look into nested containers
+      for (child_field in c("items", "elems", "sections", "children")) {
+        child <- item[[child_field]]
+        if (is.list(child)) {
+          found <- find_panel(child)
+          if (!is.null(found)) return(found)
+        }
+      }
+    }
+    NULL
+  }
+
+  panel <- find_panel(content)
+  if (is.null(panel)) {
+    stop("Panel '", panel_id, "' not found in the tool panel structure.")
+  }
+
+  collect_tools <- function(node) {
+    collected <- list()
+    recurse <- function(x) {
+      if (!is.list(x)) return()
+      is_tool <- (!is.null(x$type) && identical(x$type, "tool")) ||
+        (!is.null(x$model_class) && grepl("tool", x$model_class, ignore.case = TRUE))
+      if (is_tool) {
+        collected <<- c(collected, list(x))
+      }
+      for (child_field in c("items", "elems", "sections", "children")) {
+        child <- x[[child_field]]
+        if (is.list(child)) lapply(child, recurse)
+      }
+    }
+    recurse(node)
+    collected
+  }
+
+  tools <- collect_tools(panel)
+  if (!length(tools)) {
+    warning("Panel found but no tool entries were detected.")
+  }
+  tools
+}
+
+# Helper for coalescing values
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
+#' Retrieve detailed metadata for a Galaxy tool
+#'
+#' @param tool_id Character. The Galaxy tool identifier (for example
+#'   \code{"toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73"}).
+#' @param galaxy_url Character. Base URL of the Galaxy instance.
+#'   Default: \code{"https://usegalaxy.eu"}.
+#' @param tool_version Optional character string to request a specific
+#'   version. If \code{NULL}, Galaxy will return the default/latest
+#'   version metadata.
+#'
+#' @return A list containing the tool metadata as returned by the Galaxy
+#'   API (inputs, outputs, help text, etc.).
+#'
+#' @examples
+#' \dontrun{
+#' fastqc_tool <- galaxy_get_tool("toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73")
+#' names(fastqc_tool$inputs)
+#' }
+#'
+#' @export
+galaxy_get_tool <- function(tool_id,
+                            galaxy_url = "https://usegalaxy.eu",
+                            tool_version = NULL) {
+  if (missing(tool_id) || !nzchar(tool_id)) {
+    stop("tool_id is required.")
+  }
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop("Package 'httr' is required.")
+  }
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  url <- paste(galaxy_url, "api", "tools", tool_id, sep = "/")
+  res <- httr::GET(
+    url = url,
+    httr::add_headers(`x-api-key` = api_key),
+    query = list(tool_version = tool_version, io_details = 'true')
+  )
+  httr::stop_for_status(res)
+  httr::content(res, as = "parsed", simplifyVector = FALSE)
+}
+
+#' Retrieve Galaxy tool IDs by name
+#'
+#' @param name Character string to search for in tool names.
+#' @param tools Optional list as returned by \code{galaxy_list_tools}.
+#'   If \code{NULL}, the function will fetch tools on the fly by calling
+#'   \code{galaxy_list_tools}.
+#' @param ignore_case Logical. Whether matching should ignore case.
+#'   Default: \code{TRUE}.
+#' @param galaxy_url Character. Base URL of the Galaxy instance.
+#'   Ignored when \code{tools} is supplied. Default: \code{"https://usegalaxy.eu"}.
+#' @param panel_id Optional character. Passed through to
+#'   \code{galaxy_list_tools} when \code{tools} is \code{NULL} so you can
+#'   restrict the search to a panel/section.
+#'
+#' @return Character vector of matching tool IDs. Returns \code{character(0)}
+#'   if no tools match.
+#'
+#' @examples
+#' \dontrun{
+#' galaxy_set_api_key("YOUR_KEY")
+#'
+#' # Fetch the full tool list once, then lookup
+#' tools <- galaxy_list_tools()
+#' galaxy_get_tool_id("FastQC", tools = tools)
+#'
+#' # Or let the helper fetch on demand
+#' galaxy_get_tool_id("FastQC")
+#'
+#' # Exact, case-sensitive match inside a specific panel
+#' galaxy_get_tool_id("Concatenate datasets", exact = TRUE,
+#'                    ignore_case = FALSE, panel_id = "textutil")
+#' }
+#'
+#' @export
+galaxy_get_tool_id <- function(name,
+                               tools = NULL,
+                               ignore_case = TRUE,
+                               galaxy_url = "https://usegalaxy.eu",
+                               panel_id = NULL) {
+  if (missing(name) || !nzchar(name)) {
+    stop("Argument 'name' must be a non-empty string.")
+  }
+
+  if (is.null(tools)) {
+    tools <- galaxy_list_tools(galaxy_url = galaxy_url, panel_id = panel_id)
+  }
+
+  if (!is.list(tools)) {
+    stop("'tools' must be a list as returned by galaxy_list_tools().")
+  }
+
+  tool_entries <- data.frame(t(sapply(tools, function(x) c(x$model_class, x$id, x$name))))
+  tool_entries <- tool_entries[tool_entries[,1] == "Tool",]
+
+  if (!length(tool_entries)) {
+    warning("No tool entries detected in the provided 'tools' object.")
+    return(character(0))
+  }
+
+  matches <- grep(name, tool_entries[,3], ignore.case = ignore_case)
+  return(tool_entries[matches,2])
+}
+
+#' Run a Galaxy tool programmatically
+#'
+#' @param tool_id Character. Tool identifier to execute.
+#' @param history_id Character. History ID where outputs will be stored.
+#' @param inputs Named list describing tool inputs exactly as required
+#'   by the Galaxy tool. The list will be JSON-encoded automatically.
+#' @param galaxy_url Character. Base Galaxy URL. Default:
+#'   \code{"https://usegalaxy.eu"}.
+#'
+#' @return The job_id for the invocation.
+#'
+#' @details
+#' This sends a POST request to \code{/api/tools} with the required
+#' payload. You can check the structure expected for \code{inputs} by
+#' inspecting \code{galaxy_get_tool()} or by looking at Galaxy's
+#' "Paste Request" feature in the web UI.
+#'
+#' @examples
+#' \dontrun{
+#' res <- galaxy_run_tool(
+#'   tool_id = "upload1",
+#'   history_id = "your-history-id",
+#'   inputs = list(dbkey = "?", file_type = "auto")
+#' )
+#' }
+#'
+#' @export
+galaxy_run_tool <- function(tool_id,
+                            history_id,
+                            inputs,
+                            galaxy_url = "https://usegalaxy.eu") {
+  if (!requireNamespace("httr", quietly = TRUE) ||
+      !requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Packages 'httr' and 'jsonlite' are required.")
+  }
+  if (missing(tool_id) || !nzchar(tool_id)) stop("tool_id is required.")
+  if (missing(history_id) || !nzchar(history_id)) stop("history_id is required.")
+  if (missing(inputs) || !is.list(inputs)) stop("inputs must be a named list.")
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) stop("GALAXY_API_KEY environment variable is not set.")
+
+  payload <- list(
+    history_id = history_id,
+    tool_id = tool_id,
+    inputs = inputs
+  )
+
+  res <- httr::POST(
+    url = paste0(galaxy_url, "/api/tools"),
+    httr::add_headers(
+      `x-api-key` = api_key,
+      `Content-Type` = "application/json"
+    ),
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE)
+  )
+  httr::stop_for_status(res)
+  job <- httr::content(res, as = "parsed", simplifyVector = FALSE)
+  return(job$jobs[[1]]$id)
+}
+
+#' Upload a dataset via HTTPS (direct POST) into Galaxy
+#'
+#' @param input_file Character. Path to the local file to upload.
+#' @param history_id Character. ID of the Galaxy history to receive the dataset.
+#' @param galaxy_url Character. Base URL of the Galaxy instance.
+#'   Default: \code{"https://usegalaxy.eu"}.
+#' @param file_type Character. Galaxy datatype identifier
+#'   (for example \code{"auto"}, \code{"fastq"}, \code{"bam"}). Default: \code{"auto"}.
+#' @param dbkey Character. Reference genome identifier (for example \code{"?"} or \code{"hg38"}). Default: \code{"?"}.
+#'
+#' @return A list describing the newly created dataset(s) as returned by Galaxy.
+#'
+#' @details
+#' This function uses the built-in \code{upload1} tool and performs a
+#' multipart form POST. Large files may still require FTP depending on
+#' the Galaxy server's configuration limits.
+#'
+#' @examples
+#' \dontrun{
+#' galaxy_upload_https("reads.fastq.gz", history_id = "abc123")
+#' }
+#'
+#' @export
+galaxy_upload_https <- function(
+    input_file,
+    history_id,
+    galaxy_url = "https://usegalaxy.eu",
+    file_type = "auto",
+    dbkey = "?"
+) {
+
+  if (!requireNamespace("httr", quietly = TRUE) ||
+      !requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Packages 'httr' and 'jsonlite' are required.")
+  }
+
+  if (!file.exists(input_file))
+    stop("input_file does not exist: ", input_file)
+
+  if (missing(history_id) || !nzchar(history_id))
+    stop("history_id is required.")
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key))
+    stop("GALAXY_API_KEY environment variable is not set.")
+
+  galaxy_wait_for_dataset <- function(
+    dataset_id,
+    galaxy_url = "https://usegalaxy.eu",
+    poll_interval = 3,
+    timeout = 600
+  ) {
+    api_key <- Sys.getenv("GALAXY_API_KEY")
+    start_time <- Sys.time()
+
+    repeat {
+      res <- httr::GET(
+        url = paste0(galaxy_url, "/api/datasets/", dataset_id),
+        httr::add_headers(`x-api-key` = api_key)
+      )
+      httr::stop_for_status(res)
+
+      ds <- httr::content(res, as = "parsed")
+
+      if (ds$state == "ok") {
+        return(ds)
+      }
+
+      if (ds$state == "error") {
+        stop("Galaxy dataset failed: ", ds$misc_info)
+      }
+
+      if (as.numeric(Sys.time() - start_time, units = "secs") > timeout) {
+        stop("Timed out waiting for dataset to finish")
+      }
+
+      Sys.sleep(poll_interval)
+    }
+  }
+
+  targets <- list(list(
+    destination = list(type = "hdas"),
+    elements = list(list(
+      dbkey = dbkey,
+      ext = file_type,
+      name = basename(input_file),
+      space_to_tab = FALSE,
+      src = "files",
+      to_posix_lines = TRUE
+    ))
+  ))
+
+  res <- httr::POST(
+    url = paste0(galaxy_url, "/api/tools/fetch"),
+    httr::add_headers(`x-api-key` = api_key),
+    body = list(
+      auto_decompress = TRUE,
+      history_id = history_id,
+      targets = jsonlite::toJSON(targets, auto_unbox = TRUE),
+      files_0 = httr::upload_file(input_file)
+    ),
+    encode = "multipart"
+  )
+
+  httr::stop_for_status(res)
+  response <- httr::content(res, as = "parsed")
+
+  ## Extract encoded dataset ID
+  dataset_id <- response$outputs[[1]]$id
+
+  ## Wait until Galaxy finishes processing it
+  dataset <- galaxy_wait_for_dataset(
+    dataset_id = dataset_id,
+    galaxy_url = galaxy_url
+  )
+
+  ## Return completed dataset (or dataset$id)
+  return(dataset)
+}
+
+
+#' Wait for a Galaxy job to complete
+#'
+#' Polls the Galaxy API until a job reaches a terminal state
+#' (`ok`, `error`, or `deleted`).
+#'
+#' @param job_id Character scalar. Encoded Galaxy job ID.
+#' @param galaxy_url Character scalar. Base Galaxy URL.
+#'   Defaults to `"https://usegalaxy.eu"`.
+#' @param poll_interval Numeric. Seconds to wait between status checks.
+#'   Defaults to 3.
+#' @param timeout Numeric. Maximum time to wait in seconds.
+#'   Defaults to 600 (10 minutes).
+#'
+#' @return A named list containing the final Galaxy job object.
+#'
+#' @details
+#' Galaxy jobs are executed asynchronously. This function polls
+#' `/api/jobs/{job_id}` until the job state becomes `"ok"`.
+#'
+#' If the job enters state `"error"` or `"deleted"`, an error is raised.
+#' If the timeout is exceeded, the function stops with an error.
+#'
+#' @seealso
+#' \itemize{
+#'   \item \code{\link{galaxy_run_tool}} for submitting tools
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' job <- galaxy_run_tool(
+#'   tool_id = tool,
+#'   history_id = history,
+#'   inputs = list(
+#'     text_input = "added text",
+#'     infile = list(src = "hda", id = file_id$id)
+#'   )
+#' )
+#'
+#' final_job <- galaxy_wait_for_job(job$jobs[[1]]$id)
+#' }
+#'
+#' @export
+galaxy_wait_for_job <- function(
+    job_id,
+    galaxy_url = "https://usegalaxy.eu",
+    poll_interval = 3,
+    timeout = 600
+) {
+
+  if (!requireNamespace("httr", quietly = TRUE)) {
+    stop("Package 'httr' is required.")
+  }
+
+  if (missing(job_id) || !nzchar(job_id)) {
+    stop("job_id is required.")
+  }
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  start_time <- Sys.time()
+
+  repeat {
+
+    res <- httr::GET(
+      url = paste0(galaxy_url, "/api/jobs/", job_id),
+      httr::add_headers(`x-api-key` = api_key)
+    )
+    httr::stop_for_status(res)
+
+    job <- httr::content(res, as = "parsed")
+
+    state <- job$state
+
+    if (state == "ok") {
+      return(job)
+    }
+
+    if (state %in% c("error", "deleted")) {
+      stop(
+        "Galaxy job failed (state = '", state, "').\n",
+        if (!is.null(job$stderr)) job$stderr else ""
+      )
+    }
+
+    if (as.numeric(difftime(Sys.time(), start_time, units = "secs")) > timeout) {
+      stop("Timed out waiting for Galaxy job to finish.")
+    }
+
+    Sys.sleep(poll_interval)
+  }
 }
