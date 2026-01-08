@@ -83,7 +83,7 @@ tool <- galaxy_get_tool_id("Add line to file")
 
 # Create a temporary input file
 test_file <- tempfile(fileext = ".txt")
-test_text <- "This is 2 example \ntest file."
+test_text <- "This is an example \ntest file."
 writeLines(test_text, test_file)
 
 # Upload the file to Galaxy
@@ -175,4 +175,9 @@ Terminal states:
 | `galaxy_history_size()` | Compute history disk usage |
 
 ---
+
+Author: 
+Julian Frey
+Chair of Forest Growth and Dendroecology
+Freiburg University
 
