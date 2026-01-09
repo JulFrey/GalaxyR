@@ -2,7 +2,8 @@
 % Please edit documentation in R/2025-10-27_JF_R_Galaxy_functions.R
 \name{galaxy_history_size}
 \alias{galaxy_history_size}
-\title{Get the disk usage / size of a Galaxy history}
+\title{Galaxy history size
+Get the disk usage / size of a Galaxy history}
 \usage{
 galaxy_history_size(
   history_id,
@@ -28,4 +29,15 @@ summary endpoint. If that is not present it fetches the history contents
 and sums dataset sizes (robust to a few different field names used by
 different Galaxy versions). Results are returned as a data.frame with
 bytes and a human-readable size.
+}
+\examples{
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+histories <- galaxy_list_histories()
+if(nrow(histories > 0)){
+  galaxy_history_size(histories$history_id[1])
+} else {
+  message("No histories found for current user.")
+}
+
+\dontshow{\}) # examplesIf}
 }
