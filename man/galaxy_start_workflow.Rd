@@ -18,7 +18,9 @@ galaxy_start_workflow(
 
 \item{history_id}{The ID of the history where the workflow will run}
 
-\item{galaxy_url}{Base URL of the Galaxy instance}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 invocation_id The ID of the started workflow invocation

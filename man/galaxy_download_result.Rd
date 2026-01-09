@@ -15,7 +15,9 @@ galaxy_download_result(
 
 \item{out_file}{Path to save the downloaded file}
 
-\item{galaxy_url}{Base URL of the Galaxy instance}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 The response object from the download request for debugging

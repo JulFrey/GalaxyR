@@ -13,7 +13,9 @@ galaxy_history_size(
 \arguments{
 \item{history_id}{Galaxy history id (required)}
 
-\item{galaxy_url}{Base URL of the Galaxy instance (default: "https://usegalaxy.eu")}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{include_deleted}{Logical; whether to include deleted datasets when summing (default FALSE)}
 }

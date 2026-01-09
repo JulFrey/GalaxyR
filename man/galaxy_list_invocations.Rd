@@ -9,7 +9,9 @@ galaxy_list_invocations(workflow_id, galaxy_url = "https://usegalaxy.eu")
 \arguments{
 \item{workflow_id}{The Galaxy workflow id to list invocations for}
 
-\item{galaxy_url}{Base URL of the Galaxy instance, e.g. "https://usegalaxy.eu"}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 data.frame with columns: invocation_id, workflow_id, history_id, state, create_time, update_time

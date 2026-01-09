@@ -14,8 +14,9 @@ galaxy_wait_for_job(
 \arguments{
 \item{job_id}{Character scalar. Encoded Galaxy job ID.}
 
-\item{galaxy_url}{Character scalar. Base Galaxy URL.
-Defaults to \code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{poll_interval}{Numeric. Seconds to wait between status checks.
 Defaults to 3.}
@@ -38,19 +39,28 @@ If the job enters state \code{"error"} or \code{"deleted"}, an error is raised.
 If the timeout is exceeded, the function stops with an error.
 }
 \examples{
-\dontrun{
-job <- galaxy_run_tool(
-  tool_id = tool,
-  history_id = history,
-  inputs = list(
-    text_input = "added text",
-    infile = list(src = "hda", id = file_id$id)
-  )
-)
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+history_id <- galaxy_initialize("add line")
+tool <- galaxy_get_tool_id("Add line to file")
+test_file <- tempfile(fileext = ".txt")
+test_text <- "This is an example \ntest file."
+writeLines(test_text,test_file)
 
-final_job <- galaxy_wait_for_job(job$jobs[[1]]$id)
-}
+file_id <- galaxy_upload_https(test_file, history_id)
 
+inputs <- galaxy_get_tool(tool)
+
+job_id <- galaxy_run_tool(tool_id = tool, history_id = history_id, inputs = list(
+  text_input = "added text",
+  infile = list(
+    src = "hda",
+    id  = file_id$id
+  ),
+  options = "header"   # optional, but explicit is good
+))
+
+result <- galaxy_wait_for_job(job_id)
+\dontshow{\}) # examplesIf}
 }
 \seealso{
 \itemize{

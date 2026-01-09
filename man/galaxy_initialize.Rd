@@ -2,26 +2,34 @@
 % Please edit documentation in R/2025-10-27_JF_R_Galaxy_functions.R
 \name{galaxy_initialize}
 \alias{galaxy_initialize}
-\title{Start a session with the GALAXY API}
+\title{Create a new Galaxy history}
 \usage{
 galaxy_initialize(name = "R API request", galaxy_url = "https://usegalaxy.eu")
 }
 \arguments{
 \item{name}{Name of the history to create}
 
-\item{galaxy_url}{Your Galaxy API key}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
-history_id The ID of the created history
+Character scalar. Encoded Galaxy history ID, which must be supplied to
+subsequent upload, tool, or workflow functions.
 }
 \description{
-Start a session with the GALAXY API
+Creates a new history on a Galaxy instance and returns its ID.
+}
+\details{
+A valid Galaxy API key is required and must be available via the
+\code{GALAXY_API_KEY} environment variable. You can either add the variable to your .Renviron file and restart or use \code{\link{galaxy_set_credentials}} to set this up. This function should be called prior to any tool or workflow invocations to set up a history.
 }
 \examples{
-\dontrun{
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+
+# Requires a Galaxy API key (GALAXY_API_KEY)
+
 # set up your API Key in your .Renviron file first
-galaxy_url <- "https://usegalaxy.eu"
-api_key <- Sys.getenv("GALAXY_API_KEY")
-history_id <- galaxy_initialize(api_key)
-}
+history_id <- galaxy_initialize("My history name")
+\dontshow{\}) # examplesIf}
 }

@@ -22,23 +22,23 @@ If \code{NULL}, the function will fetch tools on the fly by calling
 \item{ignore_case}{Logical. Whether matching should ignore case.
 Default: \code{TRUE}.}
 
-\item{galaxy_url}{Character. Base URL of the Galaxy instance.
-Ignored when \code{tools} is supplied. Default: \code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{panel_id}{Optional character. Passed through to
 \code{galaxy_list_tools} when \code{tools} is \code{NULL} so you can
 restrict the search to a panel/section.}
 }
 \value{
-Character vector of matching tool IDs. Returns \code{character(0)}
+Character vector of matching tool IDs in decreasing order (usually highest version first). Returns \code{character(0)}
 if no tools match.
 }
 \description{
 Retrieve Galaxy tool IDs by name
 }
 \examples{
-\dontrun{
-galaxy_set_api_key("YOUR_KEY")
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
 
 # Fetch the full tool list once, then lookup
 tools <- galaxy_list_tools()
@@ -50,6 +50,6 @@ galaxy_get_tool_id("FastQC")
 # Exact, case-sensitive match inside a specific panel
 galaxy_get_tool_id("Concatenate datasets", exact = TRUE,
                    ignore_case = FALSE, panel_id = "textutil")
-}
 
+\dontshow{\}) # examplesIf}
 }

@@ -18,7 +18,9 @@ galaxy_delete_datasets(
 
 \item{sleep}{Numeric. Seconds to wait between API calls. Default: \code{0.2}.}
 
-\item{galaxy_url}{Character. Base URL of the Galaxy instance.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 A named list where each element is the return value from
@@ -30,10 +32,16 @@ Convenience wrapper that deletes a vector of dataset IDs using
 sleep between calls to avoid overwhelming the server.
 }
 \examples{
-\dontrun{
-Sys.setenv(GALAXY_API_KEY = "MY_KEY")
-ids <- c("id1", "id2", "id3")
-res <- galaxy_delete_datasets(ids, purge = TRUE)
-}
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+input_file <- tempfile(fileext = ".txt")
+input_file2 <- tempfile(fileext = ".txt")
+test_text <- "This is an example \nfile."
+writeLines(test_text,input_file)
+writeLines(test_text,input_file2)
+history_id <- galaxy_initialize("test upload")
+dataset_id <- galaxy_upload_https(input_file, history_id)
+dataset_id2 <- galaxy_upload_https(input_file2, history_id)
 
+galaxy_delete_datasets(c(dataset_id, dataset_id2))
+\dontshow{\}) # examplesIf}
 }

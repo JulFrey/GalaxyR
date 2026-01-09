@@ -23,8 +23,8 @@ depending on Galaxy configuration. Default: \code{TRUE}.}
 status code will be printed. Default: \code{TRUE}.}
 
 \item{galaxy_url}{Character. Base URL of the Galaxy instance
-including scheme (for example \code{"https://usegalaxy.eu"}).
-Default: \code{"https://usegalaxy.eu"}.}
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 A named list with elements:
@@ -49,9 +49,14 @@ removes data.
 }
 }
 \examples{
-\dontrun{
-Sys.setenv(GALAXY_API_KEY = "MY_KEY")
-galaxy_delete_dataset("abcdef12-3456-7890-abcd-ef1234567890")
-}
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+input_file <- tempfile(fileext = ".txt")
+test_text <- "This is an example \nfile."
+writeLines(test_text,input_file)
+history_id <- galaxy_initialize("test upload")
+dataset_id <- galaxy_upload_https(input_file, history_id)
 
+galaxy_delete_dataset(dataset_id)
+
+\dontshow{\}) # examplesIf}
 }

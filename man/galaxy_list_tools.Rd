@@ -11,8 +11,9 @@ galaxy_list_tools(
 )
 }
 \arguments{
-\item{galaxy_url}{Character. Base URL of the Galaxy instance.
-Default: \code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{in_panel}{Logical. If \code{TRUE}, return the tool panel
 structure (sections/categories). If \code{FALSE}, return the flat
@@ -34,7 +35,7 @@ as provided by Galaxy).
 List tools installed on a Galaxy instance
 }
 \examples{
-\dontrun{
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
 # All tools (flat list)
 galaxy_list_tools()
 
@@ -44,6 +45,6 @@ galaxy_list_tools(in_panel = TRUE)
 # Tools from a specific panel (match by id or name)
 galaxy_list_tools(panel_id = "get-data")
 galaxy_list_tools(panel_id = "Get Data")
-}
 
+\dontshow{\}) # examplesIf}
 }

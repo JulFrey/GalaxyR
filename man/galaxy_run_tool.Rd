@@ -19,8 +19,9 @@ galaxy_run_tool(
 \item{inputs}{Named list describing tool inputs exactly as required
 by the Galaxy tool. The list will be JSON-encoded automatically.}
 
-\item{galaxy_url}{Character. Base Galaxy URL. Default:
-\code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 The job_id for the invocation.
@@ -35,12 +36,30 @@ inspecting \code{galaxy_get_tool()} or by looking at Galaxy's
 "Paste Request" feature in the web UI.
 }
 \examples{
-\dontrun{
-res <- galaxy_run_tool(
-  tool_id = "upload1",
-  history_id = "your-history-id",
-  inputs = list(dbkey = "?", file_type = "auto")
-)
-}
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+history_id <- galaxy_initialize("add line")
+tool <- galaxy_get_tool_id("Add line to file")
+test_file <- tempfile(fileext = ".txt")
+test_text <- "This is an example \ntest file."
+writeLines(test_text,test_file)
 
+file_id <- galaxy_upload_https(test_file, history_id)
+
+inputs <- galaxy_get_tool(tool)
+
+job_id <- galaxy_run_tool(tool_id = tool, history_id = history_id, inputs = list(
+  text_input = "added text",
+  infile = list(
+    src = "hda",
+    id  = file_id$id
+  ),
+  options = "header"   # optional, but explicit is good
+))
+
+result <- galaxy_wait_for_job(job_id)
+
+test_file_result <- tempfile(fileext = ".txt")
+galaxy_download_result(list(output_ids = result$outputs$outfile$id), test_file_result)
+readLines(test_file_result)
+\dontshow{\}) # examplesIf}
 }

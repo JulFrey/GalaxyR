@@ -14,8 +14,9 @@ galaxy_get_tool(
 \item{tool_id}{Character. The Galaxy tool identifier (for example
 \code{"toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73"}).}
 
-\item{galaxy_url}{Character. Base URL of the Galaxy instance.
-Default: \code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{tool_version}{Optional character string to request a specific
 version. If \code{NULL}, Galaxy will return the default/latest
@@ -29,9 +30,9 @@ API (inputs, outputs, help text, etc.).
 Retrieve detailed metadata for a Galaxy tool
 }
 \examples{
-\dontrun{
-fastqc_tool <- galaxy_get_tool("toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73")
-names(fastqc_tool$inputs)
-}
-
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+tool_id <- galaxy_get_tool_id("FastQC")[1]
+fastqc_tool <- galaxy_get_tool(tool_id)
+fastqc_tool$description
+\dontshow{\}) # examplesIf}
 }

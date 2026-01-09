@@ -7,11 +7,18 @@
 galaxy_list_histories(galaxy_url = "https://usegalaxy.eu")
 }
 \arguments{
-\item{galaxy_url}{Base URL of the Galaxy instance, e.g. "https://usegalaxy.eu"}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
 data.frame with columns: name, history_id
 }
 \description{
 List Galaxy histories (name and history id)
+}
+\examples{
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+histories <- galaxy_list_histories()
+\dontshow{\}) # examplesIf}
 }

@@ -17,8 +17,9 @@ galaxy_upload_https(
 
 \item{history_id}{Character. ID of the Galaxy history to receive the dataset.}
 
-\item{galaxy_url}{Character. Base URL of the Galaxy instance.
-Default: \code{"https://usegalaxy.eu"}.}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{file_type}{Character. Galaxy datatype identifier
 (for example \code{"auto"}, \code{"fastq"}, \code{"bam"}). Default: \code{"auto"}.}
@@ -37,8 +38,13 @@ multipart form POST. Large files may still require FTP depending on
 the Galaxy server's configuration limits.
 }
 \examples{
-\dontrun{
-galaxy_upload_https("reads.fastq.gz", history_id = "abc123")
-}
+\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
+history_id <- galaxy_initialize("add line")
+tool <- galaxy_get_tool_id("Add line to file")
+test_file <- tempfile(fileext = ".txt")
+test_text <- "This is an example \ntest file."
+writeLines(test_text,test_file)
 
+file_id <- galaxy_upload_https(test_file, history_id)
+\dontshow{\}) # examplesIf}
 }

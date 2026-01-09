@@ -13,7 +13,9 @@ galaxy_poll_workflow(
 \arguments{
 \item{invocation_id}{The ID of the workflow invocation to poll}
 
-\item{galaxy_url}{Base URL of the Galaxy instance}
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(for example \code{"https://usegalaxy.eu"}).
+If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 
 \item{poll_interval}{Time in seconds between polling attempts in seconds}
 }
