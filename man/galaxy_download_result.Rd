@@ -34,7 +34,9 @@ f_path <- paste(tmp_dir, f_name, sep = "\\\\")
 write.csv(datasets::iris, f_path, row.names = FALSE)
 
 workflows <- galaxy_list_workflows(include_public = TRUE)
-iris_workflow <- workflows[workflows$name == "Exploring Iris dataset with statistics and scatterplots",][1,]
+iris_workflow <- workflows[
+  workflows$name == "Exploring Iris dataset with statistics and scatterplots",
+][1,]
 
 history_id <- galaxy_initialize("IRIS")
 file_id <- galaxy_upload_https(f_path, history_id)

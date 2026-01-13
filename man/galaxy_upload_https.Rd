@@ -7,6 +7,8 @@
 galaxy_upload_https(
   input_file,
   history_id,
+  wait = FALSE,
+  wait_timeout = 600,
   galaxy_url = "https://usegalaxy.eu",
   file_type = "auto",
   dbkey = "?"
@@ -15,7 +17,9 @@ galaxy_upload_https(
 \arguments{
 \item{input_file}{Character. Path to the local file to upload.}
 
-\item{history_id}{Character. ID of the Galaxy history to receive the dataset.}
+\item{wait}{Logical. Whether to wait for Galaxy to finish processing}
+
+\item{wait_timeout}{Integer. Time in seconds until wait times out with an error.}
 
 \item{galaxy_url}{Character. Base URL of the Galaxy instance
 (for example \code{"https://usegalaxy.eu"}).
@@ -39,8 +43,7 @@ the Galaxy server's configuration limits.
 }
 \examples{
 \dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
-history_id <- galaxy_initialize("add line")
-tool <- galaxy_get_tool_id("Add line to file")
+history_id <- galaxy_initialize("test upload")
 test_file <- tempfile(fileext = ".txt")
 test_text <- "This is an example \ntest file."
 writeLines(test_text,test_file)

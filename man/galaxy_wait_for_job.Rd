@@ -54,9 +54,9 @@ job_id <- galaxy_run_tool(tool_id = tool, history_id = history_id, inputs = list
   text_input = "added text",
   infile = list(
     src = "hda",
-    id  = file_id$id
+    id  = file_id
   ),
-  options = "header"   # optional, but explicit is good
+  options = "header"
 ))
 
 result <- galaxy_wait_for_job(job_id)

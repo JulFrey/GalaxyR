@@ -48,8 +48,8 @@ galaxy_get_tool_id("FastQC", tools = tools)
 galaxy_get_tool_id("FastQC")
 
 # Exact, case-sensitive match inside a specific panel
-galaxy_get_tool_id("Concatenate datasets", exact = TRUE,
-                   ignore_case = FALSE, panel_id = "textutil")
+galaxy_get_tool_id("Concatenate datasets",
+ignore_case = FALSE, panel_id = "Text Manipulation")
 
 \dontshow{\}) # examplesIf}
 }

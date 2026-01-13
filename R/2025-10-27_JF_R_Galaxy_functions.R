@@ -412,7 +412,9 @@ galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.
 #' write.csv(datasets::iris, f_path, row.names = FALSE)
 #'
 #' workflows <- galaxy_list_workflows(include_public = TRUE)
-#' iris_workflow <- workflows[workflows$name == "Exploring Iris dataset with statistics and scatterplots",][1,]
+#' iris_workflow <- workflows[
+#'   workflows$name == "Exploring Iris dataset with statistics and scatterplots",
+#' ][1,]
 #'
 #' history_id <- galaxy_initialize("IRIS")
 #' file_id <- galaxy_upload_https(f_path, history_id)
@@ -1075,8 +1077,8 @@ galaxy_get_tool <- function(tool_id,
 #' galaxy_get_tool_id("FastQC")
 #'
 #' # Exact, case-sensitive match inside a specific panel
-#' galaxy_get_tool_id("Concatenate datasets", exact = TRUE,
-#'                    ignore_case = FALSE, panel_id = "textutil")
+#' galaxy_get_tool_id("Concatenate datasets",
+#' ignore_case = FALSE, panel_id = "Text Manipulation")
 #'
 #'
 #' @export
@@ -1144,7 +1146,7 @@ galaxy_get_tool_id <- function(name,
 #'   text_input = "added text",
 #'   infile = list(
 #'     src = "hda",
-#'     id  = file_id$id
+#'     id  = file_id
 #'   ),
 #'   options = "header"   # optional, but explicit is good
 #' ))
@@ -1190,7 +1192,9 @@ galaxy_run_tool <- function(tool_id,
 #' Upload a dataset via HTTPS (direct POST) into Galaxy
 #'
 #' @param input_file Character. Path to the local file to upload.
-#' @param history_id Character. ID of the Galaxy history to receive the dataset.
+#' @param wait Logical. Whether to wait for Galaxy to finish processingram history_id Character. ID of the Galaxy history to receive the dataset.
+#' @param wait Logical. Whether to wait for Galaxy to finish processing
+#' @param wait_timeout Integer. Time in seconds until wait times out with an error.
 #' @param galaxy_url Character. Base URL of the Galaxy instance
 #'   (for example \code{"https://usegalaxy.eu"}).
 #'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
@@ -1206,8 +1210,7 @@ galaxy_run_tool <- function(tool_id,
 #' the Galaxy server's configuration limits.
 #'
 #' @examplesIf galaxy_has_key()
-#' history_id <- galaxy_initialize("add line")
-#' tool <- galaxy_get_tool_id("Add line to file")
+#' history_id <- galaxy_initialize("test upload")
 #' test_file <- tempfile(fileext = ".txt")
 #' test_text <- "This is an example \ntest file."
 #' writeLines(test_text,test_file)
@@ -1218,6 +1221,8 @@ galaxy_run_tool <- function(tool_id,
 galaxy_upload_https <- function(
     input_file,
     history_id,
+    wait = FALSE,
+    wait_timeout = 600,
     galaxy_url = "https://usegalaxy.eu",
     file_type = "auto",
     dbkey = "?"
@@ -1300,11 +1305,13 @@ galaxy_upload_https <- function(
   dataset_id <- response$outputs[[1]]$id
 
   ## Wait until Galaxy finishes processing it
-  dataset <- galaxy_wait_for_dataset(
-    dataset_id = dataset_id,
-    galaxy_url = galaxy_url
-  )
-
+  if(wait){
+    dataset <- galaxy_wait_for_dataset(
+      dataset_id = dataset_id,
+      galaxy_url = galaxy_url,
+      timeout = wait_timeout
+    )
+  }
   ## Return completed dataset (or dataset$id)
   return(dataset_id)
 }
@@ -1353,9 +1360,9 @@ galaxy_upload_https <- function(
 #'   text_input = "added text",
 #'   infile = list(
 #'     src = "hda",
-#'     id  = file_id$id
+#'     id  = file_id
 #'   ),
-#'   options = "header"   # optional, but explicit is good
+#'   options = "header"
 #' ))
 #'
 #' result <- galaxy_wait_for_job(job_id)
