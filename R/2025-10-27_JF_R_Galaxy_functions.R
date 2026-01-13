@@ -1192,7 +1192,7 @@ galaxy_run_tool <- function(tool_id,
 #' Upload a dataset via HTTPS (direct POST) into Galaxy
 #'
 #' @param input_file Character. Path to the local file to upload.
-#' @param wait Logical. Whether to wait for Galaxy to finish processingram history_id Character. ID of the Galaxy history to receive the dataset.
+#' @param history_id Character. ID of the Galaxy history to receive the data set.
 #' @param wait Logical. Whether to wait for Galaxy to finish processing
 #' @param wait_timeout Integer. Time in seconds until wait times out with an error.
 #' @param galaxy_url Character. Base URL of the Galaxy instance

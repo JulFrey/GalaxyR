@@ -17,6 +17,8 @@ galaxy_upload_https(
 \arguments{
 \item{input_file}{Character. Path to the local file to upload.}
 
+\item{history_id}{Character. ID of the Galaxy history to receive the data set.}
+
 \item{wait}{Logical. Whether to wait for Galaxy to finish processing}
 
 \item{wait_timeout}{Integer. Time in seconds until wait times out with an error.}
