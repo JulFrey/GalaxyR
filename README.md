@@ -48,7 +48,7 @@ galaxy_set_credentials("your-secret-key")
 ### Option 2: Add it to `~/.Renviron` (recommended)
 ```
 #usethis::edit_r_environ()
-GALAXY_API_KEY = "your-secret-key"
+GALAXY_API_KEY = your-secret-key
 ```
 
 Restart R after editing `.Renviron`.
