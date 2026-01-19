@@ -103,7 +103,7 @@ job_id <- galaxy_run_tool(
     text_input = "added text",
     infile = list(
       src = "hda",
-      id  = file_id$id
+      id  = file_id
     ),
     options = "header"   # add text at the top of the file
   )
@@ -179,8 +179,8 @@ Terminal states:
 
 ---
 
-Author: 
-Julian Frey
-Chair of Forest Growth and Dendroecology
+Author:<br>
+Julian Frey<br>
+Chair of Forest Growth and Dendroecology<br>
 University of Freiburg
 
