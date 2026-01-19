@@ -42,11 +42,7 @@ You can either:
 
 ### Option 1: Set it once per session
 ```r
-galaxy_set_credentials(
-  api-key = "your-secret-key",
-  username = "your-username",
-  password = "your-secret-password"
-)
+galaxy_set_credentials("your-secret-key")
 ```
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
