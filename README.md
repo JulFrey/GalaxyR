@@ -42,12 +42,16 @@ You can either:
 
 ### Option 1: Set it once per session
 ```r
-galaxy_set_api_key("YOUR_GALAXY_API_KEY")
+galaxy_set_credentials(
+  api-key = "your-secret-key",
+  username = "your-username",
+  password = "your-secret-password"
+)
 ```
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
 ```
-GALAXY_API_KEY=your-secret-key
+GALAXY_API_KEY = "your-secret-key"
 ```
 
 Restart R after editing `.Renviron`.
