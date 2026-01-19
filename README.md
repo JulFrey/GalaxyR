@@ -29,7 +29,7 @@ This package is not yet on CRAN. Install directly from GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_github("YOUR_GITHUB_USERNAME/GalaxyRTools")
+remotes::install_github("JulFrey/GalaxyR")
 ```
 
 ---
@@ -181,5 +181,5 @@ Terminal states:
 Author: 
 Julian Frey
 Chair of Forest Growth and Dendroecology
-Freiburg University
+University of Freiburg
 
