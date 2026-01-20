@@ -1,0 +1,10 @@
+citHeader("To cite GalaxyR in publications use:")
+
+citEntry(
+  entry    = "misc",
+  title    = "GalaxyR",
+  author   = "Julian Frey",
+  year     = "2026",
+  url      = "https://github.com/JulFrey/GalaxyR",
+  textVersion = "Frey, J. (2026) GalaxyR. https://github.com/JulFrey/GalaxyR"
+)

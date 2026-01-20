@@ -1,6 +1,6 @@
-# GalaxyRTools
+# GalaxyR
 
-**GalaxyRTools** is an R package for programmatic interaction with the **Galaxy API** (tested primarily against [Galaxy Europe](https://usegalaxy.eu)).  
+**GalaxyR** is an R package for programmatic interaction with the **Galaxy API** (tested primarily against [Galaxy Europe](https://usegalaxy.eu)).  
 It allows you to manage histories, upload data, run tools and workflows, wait for jobs to complete, and download results — all directly from R.
 
 This package is designed for **automation, reproducibility, and scripting**, not UI replacement.
@@ -42,12 +42,13 @@ You can either:
 
 ### Option 1: Set it once per session
 ```r
-galaxy_set_api_key("YOUR_GALAXY_API_KEY")
+galaxy_set_credentials("your-secret-key")
 ```
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
 ```
-GALAXY_API_KEY=your-secret-key
+#usethis::edit_r_environ()
+GALAXY_API_KEY = your-secret-key
 ```
 
 Restart R after editing `.Renviron`.
@@ -102,7 +103,7 @@ job_id <- galaxy_run_tool(
     text_input = "added text",
     infile = list(
       src = "hda",
-      id  = file_id$id
+      id  = file_id
     ),
     options = "header"   # add text at the top of the file
   )
@@ -178,8 +179,8 @@ Terminal states:
 
 ---
 
-Author: 
-Julian Frey
-Chair of Forest Growth and Dendroecology
+Author:<br>
+Julian Frey<br>
+Chair of Forest Growth and Dendroecology<br>
 University of Freiburg
 

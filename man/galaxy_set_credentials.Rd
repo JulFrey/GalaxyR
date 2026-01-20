@@ -6,21 +6,21 @@
 \usage{
 galaxy_set_credentials(
   api_key = NULL,
-  galaxy_url = NULL,
   username = NULL,
   password = NULL,
+  galaxy_url = "https://usegalaxy.eu",
   overwrite = TRUE
 )
 }
 \arguments{
 \item{api_key}{Character. Galaxy API key.}
 
-\item{galaxy_url}{Character. Base URL of the Galaxy instance
-(e.g. \code{"https://usegalaxy.eu"}). If set all galaxy_url arguments of functions will be ignored.}
-
 \item{username}{Character. Galaxy username (only required for FTP uploads).}
 
 \item{password}{Character. Galaxy password (only required for FTP uploads).}
+
+\item{galaxy_url}{Character. Base URL of the Galaxy instance
+(e.g. \code{"https://usegalaxy.eu"}). If set all galaxy_url arguments of functions will be ignored.}
 
 \item{overwrite}{Logical. Whether to overwrite existing environment
 variables. Default: \code{TRUE}.}
@@ -49,9 +49,9 @@ Only arguments that are provided (non-NULL) are set.
 \dontrun{
 galaxy_set_credentials(
   api_key = "your-secret-key",
-  galaxy_url = "https://usegalaxy.eu",
   username = "your-username",
-  password = "your-password"
+  password = "your-password",
+  galaxy_url = "https://usegalaxy.eu"
 )
 }
 
