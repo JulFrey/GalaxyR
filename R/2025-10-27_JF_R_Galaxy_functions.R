@@ -38,125 +38,6 @@ galaxy_has_key <- function() {
   galaxy_url
 }
 
-
-#' Create a new Galaxy history
-#'
-#' Creates a new history on a Galaxy instance and returns its ID.
-#'
-#' @param name Name of the history to create
-#' @param galaxy_url Character. Base URL of the Galaxy instance
-#'   (for example \code{"https://usegalaxy.eu"}).
-#'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#'
-#' @details
-#' A valid Galaxy API key is required and must be available via the
-#' \code{GALAXY_API_KEY} environment variable. You can either add the variable to your .Renviron file and restart or use \code{\link{galaxy_set_credentials}} to set this up. This function should be called prior to any tool or workflow invocations to set up a history.
-#'
-#' @return
-#' Character scalar. Encoded Galaxy history ID, which must be supplied to
-#' subsequent upload, tool, or workflow functions.
-#'
-#' @examplesIf galaxy_has_key()
-#'
-#' # Requires a Galaxy API key (GALAXY_API_KEY)
-#'
-#' # set up your API Key in your .Renviron file first
-#' history_id <- galaxy_initialize("My history name")
-#'
-#' @export galaxy_initialize
-galaxy_initialize <- function(name = "R API request", galaxy_url = "https://usegalaxy.eu") {
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
-  hist_res <- httr::POST(
-    paste0(galaxy_url, "/api/histories"),
-    httr::add_headers(`x-api-key` = api_key, `Content-Type` = "application/json"),
-    body = jsonlite::toJSON(list(name = name), auto_unbox = TRUE)
-  )
-  httr::stop_for_status(hist_res)
-  history <- httr::content(hist_res, "parsed")
-  history_id <- history$id
-  message("Using history:", history_id, "\n")
-  return(history_id)
-}
-
-
-#' FTP file upload to galaxy.
-#'
-#' Upload a file to Galaxy and register it in a history
-#'
-#' @param input_file Path to the local file to upload
-#' @param galaxy_url Character. Base URL of the Galaxy instance
-#'   (for example \code{"https://usegalaxy.eu"}).
-#'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#' @param galaxy_ftp FTP server address of the Galaxy instance
-#' @param history_id The ID of the Galaxy history where the dataset will be uploaded
-#'
-#' @returns dataset_id The ID of the uploaded dataset in Galaxy
-#' @export galaxy_upload_ftp
-#'
-#' @examplesIf galaxy_has_key() & Sys.getenv("GALAXY_USERNAME") != "" & Sys.getenv("GALAXY_PASSWORD") != ""
-#' # set up your API Key, username and password in your .Renviron file first
-#' galaxy_ftp <- "ftp.usegalaxy.eu"
-#' input_file <- tempfile(fileext = ".txt")
-#' test_text <- "This is an example \nfile."
-#' writeLines(test_text,input_file)
-#' history_id <- galaxy_initialize("test upload")
-#' dataset_id <- galaxy_upload_ftp(input_file, history_id, galaxy_ftp)
-#' print(dataset_id)
-#'
-galaxy_upload_ftp <- function(input_file, history_id, galaxy_ftp = "ftp.usegalaxy.eu", galaxy_url = "https://usegalaxy.eu"){
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-  username <- Sys.getenv("GALAXY_USERNAME")
-  password <- Sys.getenv("GALAXY_PASSWORD")
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
-  username_enc <- utils::URLencode(username, reserved = TRUE)
-  password_enc <- utils::URLencode(password, reserved = TRUE)
-  ftp_url <- paste0("ftp://", username_enc, ":", password_enc, "@", galaxy_ftp, "/")
-
-  # UPLOAD using ftp
-  system2(
-    "curl",
-    c(
-      "--ssl-reqd", "-T", shQuote(input_file),
-      ftp_url
-    ),
-    stdout = TRUE, stderr = TRUE
-  )
-
-  # fetch the dataset using API
-  ftp_filename <- basename(input_file)
-
-  fetch_payload <- list(
-    history_id = history_id,
-    targets = list(list(
-      destination = list(type = "hdas"),
-      elements = list(list(
-        src = "ftp_import",
-        ftp_path = ftp_filename,
-        ext = "auto",
-        dbkey = "?"
-      ))
-    ))
-  )
-
-  res <- httr::POST(
-    paste0(galaxy_url, "/api/tools/fetch"),
-    httr::add_headers(`x-api-key` = api_key, `Content-Type` = "application/json"),
-    body = jsonlite::toJSON(fetch_payload, auto_unbox = TRUE)
-  )
-
-  httr::stop_for_status(res)
-  upload_result <- httr::content(res, "parsed")
-  #print(upload_result)
-
-  dataset_id <- upload_result$outputs[[1]]$id
-  return(dataset_id)
-}
-
 #' List workflows available to the user
 #'
 #' Retrieves workflows accessible to the authenticated user from a Galaxy
@@ -328,176 +209,6 @@ galaxy_get_workflow_inputs <- function(
   do.call(rbind, inputs)
 }
 
-#' Start a Galaxy workflow with inputs and parameters
-#'
-#' @param dataset_id Character. ID of the input dataset (HDA).
-#'   Used only if \code{inputs} is NULL.
-#' @param workflow_id Character. Galaxy workflow ID.
-#' @param history_id Character. History ID where the workflow will run.
-#' @param inputs Named list. Optional workflow input mapping.
-#'   Keys must be workflow input step IDs (as characters).
-#'   Values must be lists describing datasets and/or parameters.
-#' @param galaxy_url Character. Base URL of the Galaxy instance.
-#'
-#' @return Character. Workflow invocation ID.
-#'
-#' @export
-#' @importFrom stats setNames
-galaxy_start_workflow <- function(
-    dataset_id,
-    workflow_id,
-    history_id = NA,
-    inputs = NULL,
-    galaxy_url = "https://usegalaxy.eu"
-) {
-
-  if (missing(workflow_id) || !nzchar(workflow_id)) {
-    stop("workflow_id is required.")
-  }
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-  if (!nzchar(api_key)) {
-    stop("GALAXY_API_KEY environment variable is not set.")
-  }
-
-  # Build workflow inputs
-  if (is.null(inputs)) {
-    if (missing(dataset_id) || !nzchar(dataset_id)) {
-      stop("Either dataset_id or inputs must be provided.")
-    }
-
-    # Default: map dataset to workflow input step "0"
-    inputs <- setNames(
-      list(list(src = "hda", id = dataset_id)),
-      "0"
-    )
-  }
-
-  run_body <- list(inputs = inputs)
-
-  # Optional history
-  if (!is.na(history_id)) {
-    run_body$history_id <- history_id
-  }
-
-  run_url <- paste0(galaxy_url, "/api/workflows/", workflow_id, "/invocations")
-
-  run_res <- httr::POST(
-    run_url,
-    httr::add_headers(
-      `x-api-key` = api_key,
-      `Content-Type` = "application/json"
-    ),
-    body = jsonlite::toJSON(run_body, auto_unbox = TRUE)
-  )
-
-  httr::stop_for_status(run_res)
-  invocation <- httr::content(run_res, as = "parsed")
-
-  message("Workflow invocation ID: ", invocation$id)
-  invocation$id
-}
-
-#' Poll a Galaxy workflow invocation until completion
-#'
-#' @param invocation_id The ID of the workflow invocation to poll
-#' @param galaxy_url Character. Base URL of the Galaxy instance
-#'   (for example \code{"https://usegalaxy.eu"}).
-#'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#' @param poll_interval Time in seconds between polling attempts in seconds
-#'
-#' @returns A vector of HDA IDs corresponding to the output datasets of the workflow
-#'
-#' @examplesIf galaxy_has_key()
-#' # iris example
-#' tmp_dir <- tempdir()
-#' f_name <- "iris.csv"
-#' f_path <- paste(tmp_dir, f_name, sep = "\\")
-#' write.csv(datasets::iris, f_path, row.names = FALSE)
-#'
-#' workflows <- galaxy_list_workflows(include_public = TRUE)
-#' iris_workflow <- workflows[
-#'   workflows$name == "Exploring Iris dataset with statistics and scatterplots",
-#' ][1,]
-#'
-#' history_id <- galaxy_initialize("IRIS")
-#' file_id <- galaxy_upload_https(f_path, history_id)
-#' invocation_id <- galaxy_start_workflow(file_id, iris_workflow$id, history_id = history_id)
-#' dataset_ids <- galaxy_poll_workflow(invocation_id)
-#'
-#' result_files <- galaxy_get_file_info(dataset_ids$output_ids)
-#' head(result_files)
-#'
-#'
-#' @export galaxy_poll_workflow
-galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.eu", poll_interval = 30) {
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
-  any_error <- FALSE
-  repeat {
-    Sys.sleep(poll_interval)
-
-    # Get workflow invocation
-    status_res <- httr::GET(
-      paste0(galaxy_url, "/api/invocations/", invocation_id),
-      httr::add_headers(`x-api-key` = api_key)
-    )
-    httr::stop_for_status(status_res)
-    status <- httr::content(status_res, "parsed")
-
-    steps <- status$steps
-
-    # Get all job IDs from the steps
-    job_ids <- sapply(steps, function(step) step$job_id)
-    job_ids <- job_ids[!sapply(job_ids, is.null)]
-
-    if (length(job_ids) == 0) {
-      message(Sys.time(), " ,No jobs yet, waiting...")
-      next
-    }
-
-    # Check each job state
-    job_states <- sapply(job_ids, function(jid) {
-      job_res <- httr::GET(
-        paste0(galaxy_url, "/api/jobs/", jid),
-        httr::add_headers(`x-api-key` = api_key)
-      )
-      job <- httr::content(job_res, "parsed")
-      job$state
-    })
-
-    message(Sys.time(), " ,Job states: ", paste(job_states, collapse = ", "))
-
-    if (all(job_states == "ok")) {
-      message("All jobs finished successfully!")
-      break
-    }
-    if (any(job_states == "error" | job_states == "failed" | job_states == "deleted")) {
-      any_error <- TRUE
-      message("Some workflow jobs failed or were cancelled.")
-      break
-    }
-  }
-
-  # Once all jobs are ok, return the HDA IDs in the workflow history
-  history_id <- status$history_id
-  datasets_res <- httr::GET(
-    paste0(galaxy_url, "/api/histories/", history_id, "/contents"),
-    httr::add_headers(`x-api-key` = api_key)
-  )
-  datasets <- httr::content(datasets_res, "parsed")
-
-  output_ids <- sapply(datasets, function(d) if(d$state == "ok" && !isTRUE(d$deleted)) d$id else NULL)
-  output_ids <- output_ids[!sapply(output_ids, is.null)]
-  output <- list(success = !any_error, output_ids = output_ids)
-
-  return(output)
-}
-
 #' Download final result dataset from Galaxy
 #'
 #' @param output_ids Vector of HDA IDs from the workflow outputs the last one will be downloaded
@@ -532,8 +243,8 @@ galaxy_poll_workflow <- function(invocation_id, galaxy_url = "https://usegalaxy.
 #'   paste(tmp_dir, result_files$name[nrow(result_files)], sep = "\\")
 #' )
 #'
-#' @export galaxy_download_result
-galaxy_download_result <- function(output_ids, out_file = "result.laz", galaxy_url = "https://usegalaxy.eu" ){
+#' @export .galaxy_download_result
+.galaxy_download_result <- function(output_ids, out_file = "result.laz", galaxy_url = "https://usegalaxy.eu" ){
   if(!is.null(output_ids$output_ids)){
     output_ids <- output_ids$output_ids
   }
@@ -1256,14 +967,14 @@ galaxy_get_tool_id <- function(name,
 #'   options = "header"   # optional, but explicit is good
 #' ))
 #'
-#' result <- galaxy_wait_for_job(job_id)
+#' result <- galaxy_poll_tool(job_id)
 #'
 #' test_file_result <- tempfile(fileext = ".txt")
 #' galaxy_download_result(list(output_ids = result$outputs$outfile$id), test_file_result)
 #' readLines(test_file_result)
 #'
-#' @export
-galaxy_run_tool <- function(tool_id,
+#' @export .galaxy_run_tool
+.galaxy_run_tool <- function(tool_id,
                             history_id,
                             inputs,
                             galaxy_url = "https://usegalaxy.eu") {
@@ -1293,134 +1004,6 @@ galaxy_run_tool <- function(tool_id,
   job <- httr::content(res, as = "parsed", simplifyVector = FALSE)
   return(job$jobs[[1]]$id)
 }
-
-#' Upload a dataset via HTTPS (direct POST) into Galaxy
-#'
-#' @param input_file Character. Path to the local file to upload.
-#' @param history_id Character. ID of the Galaxy history to receive the data set.
-#' @param wait Logical. Whether to wait for Galaxy to finish processing
-#' @param wait_timeout Integer. Time in seconds until wait times out with an error.
-#' @param galaxy_url Character. Base URL of the Galaxy instance
-#'   (for example \code{"https://usegalaxy.eu"}).
-#'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#' @param file_type Character. Galaxy datatype identifier
-#'   (for example \code{"auto"}, \code{"fastq"}, \code{"bam"}). Default: \code{"auto"}.
-#' @param dbkey Character. Reference genome identifier (for example \code{"?"} or \code{"hg38"}). Default: \code{"?"}.
-#'
-#' @return A list describing the newly created dataset(s) as returned by Galaxy.
-#'
-#' @details
-#' This function uses the built-in \code{upload1} tool and performs a
-#' multipart form POST. Large files may still require FTP depending on
-#' the Galaxy server's configuration limits.
-#'
-#' @examplesIf galaxy_has_key()
-#' history_id <- galaxy_initialize("test upload")
-#' test_file <- tempfile(fileext = ".txt")
-#' test_text <- "This is an example \ntest file."
-#' writeLines(test_text,test_file)
-#'
-#' file_id <- galaxy_upload_https(test_file, history_id)
-#'
-#' @export
-galaxy_upload_https <- function(
-    input_file,
-    history_id,
-    wait = FALSE,
-    wait_timeout = 600,
-    galaxy_url = "https://usegalaxy.eu",
-    file_type = "auto",
-    dbkey = "?"
-) {
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
-  if (!file.exists(input_file))
-    stop("input_file does not exist: ", input_file)
-
-  if (missing(history_id) || !nzchar(history_id))
-    stop("history_id is required.")
-
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-  if (!nzchar(api_key))
-    stop("GALAXY_API_KEY environment variable is not set.")
-
-  galaxy_wait_for_dataset <- function(
-    dataset_id,
-    galaxy_url = "https://usegalaxy.eu",
-    poll_interval = 3,
-    timeout = 600
-  ) {
-    api_key <- Sys.getenv("GALAXY_API_KEY")
-    start_time <- Sys.time()
-
-    repeat {
-      res <- httr::GET(
-        url = paste0(galaxy_url, "/api/datasets/", dataset_id),
-        httr::add_headers(`x-api-key` = api_key)
-      )
-      httr::stop_for_status(res)
-
-      ds <- httr::content(res, as = "parsed")
-
-      if (ds$state == "ok") {
-        return(ds)
-      }
-
-      if (ds$state == "error") {
-        stop("Galaxy dataset failed: ", ds$misc_info)
-      }
-
-      if (as.numeric(Sys.time() - start_time, units = "secs") > timeout) {
-        stop("Timed out waiting for dataset to finish")
-      }
-
-      Sys.sleep(poll_interval)
-    }
-  }
-
-  targets <- list(list(
-    destination = list(type = "hdas"),
-    elements = list(list(
-      dbkey = dbkey,
-      ext = file_type,
-      name = basename(input_file),
-      space_to_tab = FALSE,
-      src = "files",
-      to_posix_lines = TRUE
-    ))
-  ))
-
-  res <- httr::POST(
-    url = paste0(galaxy_url, "/api/tools/fetch"),
-    httr::add_headers(`x-api-key` = api_key),
-    body = list(
-      auto_decompress = TRUE,
-      history_id = history_id,
-      targets = jsonlite::toJSON(targets, auto_unbox = TRUE),
-      files_0 = httr::upload_file(input_file)
-    ),
-    encode = "multipart"
-  )
-
-  httr::stop_for_status(res)
-  response <- httr::content(res, as = "parsed")
-
-  ## Extract encoded dataset ID
-  dataset_id <- response$outputs[[1]]$id
-
-  ## Wait until Galaxy finishes processing it
-  if(wait){
-    dataset <- galaxy_wait_for_dataset(
-      dataset_id = dataset_id,
-      galaxy_url = galaxy_url,
-      timeout = wait_timeout
-    )
-  }
-  ## Return completed dataset (or dataset$id)
-  return(dataset_id)
-}
-
 
 #' Wait for a Galaxy job to complete
 #'
@@ -1470,10 +1053,10 @@ galaxy_upload_https <- function(
 #'   options = "header"
 #' ))
 #'
-#' result <- galaxy_wait_for_job(job_id)
+#' result <- galaxy_poll_tool(job_id)
 #'
-#' @export
-galaxy_wait_for_job <- function(
+#' @export .galaxy_poll_tool
+.galaxy_poll_tool <- function(
     job_id,
     galaxy_url = "https://usegalaxy.eu",
     poll_interval = 3,
