@@ -657,3 +657,283 @@ setMethod("galaxy_poll_workflow", "Galaxy",
             validObject(x)
             x
           })
+
+#############################
+## File download
+#############################
+
+# internal helper, not exported
+#' @keywords internal
+#' @noRd
+.galaxy_download_result <- function(output_ids,
+                                    out_file   = "result.laz",
+                                    galaxy_url = "https://usegalaxy.eu") {
+  ## allow a list with element output_ids
+  if (is.list(output_ids) && "output_ids" %in% names(output_ids)) {
+    output_ids <- output_ids$output_ids
+  }
+  api_key   <- Sys.getenv("GALAXY_API_KEY")
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+  httr::GET(
+    paste0(galaxy_url, "/api/datasets/", output_ids[length(output_ids)], "/display"),
+    httr::add_headers(`x-api-key` = api_key),
+    httr::write_disk(out_file, overwrite = TRUE)
+  )
+}
+
+setGeneric("galaxy_download_result",
+           function(x,
+                    out_file   = "result.laz",
+                    galaxy_url = "https://usegalaxy.eu",
+                    ...)
+             standardGeneric("galaxy_download_result"),
+           signature = "x")
+
+#' Download final result dataset from Galaxy
+#'
+#' `galaxy_download_result()` is an S4 generic. With `x` as a character vector
+#' it is treated as a set of HDA output IDs; the last one is downloaded to
+#' `out_file` and the `httr` response is returned. With `x` as a [`Galaxy`]
+#' object, its `output_dataset_ids` and `galaxy_url` are used and the object is
+#' returned invisibly after performing the download.
+#'
+#' @param x A vector of HDA output IDs (`character`), or a `Galaxy` object.
+#' @param out_file Path to save the downloaded file.
+#' @param galaxy_url Base URL of the Galaxy instance, used by the character
+#'   method. If `GALAXY_URL` is set it takes precedence.
+#' @return For the character method, the `httr` response object from the
+#'   download request. For the `Galaxy` method, the (unchanged) `Galaxy`
+#'   object invisibly.
+#' @examplesIf galaxy_has_key()
+#' # prepare data
+#' tmp_dir <- tempdir()
+#' f_path  <- file.path(tmp_dir, "iris.csv")
+#' write.csv(datasets::iris, f_path, row.names = FALSE)
+#'
+#' #select workflow
+#' workflows    <- galaxy_list_workflows(include_public = TRUE)
+#' iris_workflow <- workflows[workflows$name ==
+#'                              "Exploring Iris dataset with statistics and scatterplots", ][1, ]
+#' # upload and run workflow
+#' gxy <- galaxy(history_name = "IRIS") |>
+#'   galaxy_initialize() |>
+#'   galaxy_upload_https(f_path) |>
+#'   galaxy_start_workflow(workflow_id = iris_workflow$id) |>
+#'   galaxy_poll_workflow() |>
+#'   galaxy_download_result(out_file = file.path(tmp_dir, result_files$name[nrow(result_files)]))
+#'
+#' # inspect the outputs
+#' result_files <- galaxy_get_file_info(gxy@output_dataset_ids)
+#' head(result_files)
+#'
+#' @export
+setMethod("galaxy_download_result", "character",
+          function(x,
+                   out_file   = "result.laz",
+                   galaxy_url = "https://usegalaxy.eu",
+                   ...) {
+            .galaxy_download_result(output_ids = x,
+                                    out_file   = out_file,
+                                    galaxy_url = galaxy_url)
+          })
+
+#' S4 download function for workflow or tool outputs
+#' @rdname galaxy_download_result
+#' @export
+setMethod("galaxy_download_result", "Galaxy",
+          function(x,
+                   out_file = "result.laz",
+                   ...) {
+            .galaxy_download_result(output_ids = x@output_dataset_ids,
+                                    out_file   = out_file,
+                                    galaxy_url = x@galaxy_url)
+            invisible(x)
+          })
+
+
+#############################
+## Tool invocation and polling
+#############################
+
+#' Helper function for single tool invocations
+#' @keywords internal
+#' @noRd
+.galaxy_run_tool <- function(tool_id, history_id, inputs,
+                             galaxy_url = "https://usegalaxy.eu") {
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+  if (missing(tool_id) || !nzchar(tool_id)) stop("tool_id is required.")
+  if (missing(history_id) || !nzchar(history_id)) stop("history_id is required.")
+  if (missing(inputs) || !is.list(inputs)) stop("inputs must be a named list.")
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) stop("GALAXY_API_KEY environment variable is not set.")
+
+  payload <- list(
+    history_id = history_id,
+    tool_id = tool_id,
+    inputs = inputs
+  )
+
+  res <- httr::POST(
+    url = paste0(galaxy_url, "/api/tools"),
+    httr::add_headers(
+      `x-api-key` = api_key,
+      `Content-Type` = "application/json"
+    ),
+    body = jsonlite::toJSON(payload, auto_unbox = TRUE)
+  )
+  httr::stop_for_status(res)
+  job <- httr::content(res, as = "parsed", simplifyVector = FALSE)
+  return(job$jobs[[1]]$id)
+}
+
+setGeneric("galaxy_run_tool",
+           function(x,
+                    tool_id,
+                    inputs,
+                    galaxy_url = "https://usegalaxy.eu",
+                    ...)
+             standardGeneric("galaxy_run_tool"),
+           signature = "x")
+
+#' Run a Galaxy tool programmatically
+#'
+#' `galaxy_run_tool()` is an S4 generic. With `x` as a character vector it is
+#' treated as a history ID; the specified tool is invoked in that history and
+#' the job ID is returned. With `x` as a [`Galaxy`] object, the history ID and
+#' URL are taken from the object and the object is updated with the job ID.
+#'
+#' @param x A history ID (`character`) or a `Galaxy` object.
+#' @param tool_id Tool identifier to execute.
+#' @param inputs Named list of tool inputs.
+#' @param galaxy_url Base URL of the Galaxy instance, used by the character
+#'   method.
+#' @return For the character method, a job ID; for the `Galaxy` method, the
+#'   modified `Galaxy` object.
+#' @export
+setMethod("galaxy_run_tool", "character",
+          function(x, tool_id, inputs,
+                   galaxy_url = "https://usegalaxy.eu", ...) {
+            .galaxy_run_tool(tool_id = tool_id,
+                             history_id = x,
+                             inputs = inputs,
+                             galaxy_url = galaxy_url)
+          })
+
+#' S4 Method for single tool invocation
+#' @rdname galaxy_run_tool
+#' @export
+setMethod("galaxy_run_tool", "Galaxy",
+          function(x, tool_id, inputs, ...) {
+            inp <- if (!is.null(inputs)) inputs else if (length(x@inputs) > 0) x@inputs else NULL
+            job_id <- .galaxy_run_tool(tool_id = tool_id,
+                                       history_id = x@history_id,
+                                       inputs = inp,
+                                       galaxy_url = x@galaxy_url)
+            x@invocation_id <- job_id
+            validObject(x)
+            x
+          })
+
+#' Helper function for tool polling
+#' @keywords internal
+#' @noRd
+.galaxy_poll_tool <- function(invocation_id,
+                              galaxy_url   = "https://usegalaxy.eu",
+                              poll_interval = 3,
+                              timeout       = 600) {
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+
+  if (missing(invocation_id) || !nzchar(invocation_id)) {
+    stop("invocation_id is required.")
+  }
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  start_time <- Sys.time()
+
+  repeat {
+
+    res <- httr::GET(
+      url = paste0(galaxy_url, "/api/jobs/", invocation_id),
+      httr::add_headers(`x-api-key` = api_key)
+    )
+    httr::stop_for_status(res)
+
+    job <- httr::content(res, as = "parsed")
+
+    state <- job$state
+
+    if (state == "ok") {
+      return(job)
+    }
+
+    if (state %in% c("error", "deleted")) {
+      stop(
+        "Galaxy job failed (state = '", state, "').\n",
+        if (!is.null(job$stderr)) job$stderr else ""
+      )
+    }
+
+    if (as.numeric(difftime(Sys.time(), start_time, units = "secs")) > timeout) {
+      stop("Timed out waiting for Galaxy job to finish.")
+    }
+
+    Sys.sleep(poll_interval)
+  }
+}
+
+setGeneric("galaxy_poll_tool",
+           function(x,
+                    galaxy_url    = "https://usegalaxy.eu",
+                    poll_interval = 3,
+                    timeout       = 600,
+                    ...)
+             standardGeneric("galaxy_poll_tool"),
+           signature = "x")
+
+#' Wait for a Galaxy job to complete
+#'
+#' @param x A job ID (`character`) or a `Galaxy` object.
+#' @param galaxy_url Base URL of the Galaxy instance, used by the character
+#'   method.
+#' @param poll_interval Seconds between status checks.
+#' @param timeout Maximum time to wait in seconds.
+#' @return For the character method, the final job object; for the `Galaxy`
+#'   method, the modified `Galaxy` object.
+#' @export
+setMethod("galaxy_poll_tool", "character",
+          function(x,
+                   galaxy_url    = "https://usegalaxy.eu",
+                   poll_interval = 3,
+                   timeout       = 600,
+                   ...) {
+            .galaxy_poll_tool(invocation_id = x,
+                              galaxy_url    = galaxy_url,
+                              poll_interval = poll_interval,
+                              timeout       = timeout)
+          })
+
+#' S4 method to poll the status of a tool invocation
+#' @rdname galaxy_poll_tool
+#' @export
+setMethod("galaxy_poll_tool", "Galaxy",
+          function(x,
+                   poll_interval = 3,
+                   timeout       = 600,
+                   ...) {
+            job <- .galaxy_poll_tool(invocation_id = x@invocation_id,
+                                     galaxy_url    = x@galaxy_url,
+                                     poll_interval = poll_interval,
+                                     timeout       = timeout)
+            if (!is.null(job$outputs)) {
+              out_ids <- vapply(job$outputs, function(o) o$id, character(1L))
+              x@output_dataset_ids <- out_ids
+            }
+            x@state <- if (identical(job$state, "ok")) "success" else "error"
+            validObject(x)
+            x
+          })
