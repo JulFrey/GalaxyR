@@ -1,5 +1,7 @@
 # GalaxyR
 
+## Description <img src="https://github.com/JulFrey/GalaxyR/blob/main/inst/figures/logo_galaxyr.png" align="right" width = 290/>
+
 **GalaxyR** is an R package for programmatic interaction with the **Galaxy API** (tested primarily against [Galaxy Europe](https://usegalaxy.eu)).  
 It allows you to manage histories, upload data, run tools and workflows, wait for jobs to complete, and download results — all directly from R.
 
