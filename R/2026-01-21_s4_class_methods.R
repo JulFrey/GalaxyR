@@ -790,7 +790,7 @@ setMethod("galaxy_download_result", "Galaxy",
 setGeneric("galaxy_run_tool",
            function(x,
                     tool_id,
-                    inputs,
+                    inputs = NULL,
                     galaxy_url = "https://usegalaxy.eu",
                     ...)
              standardGeneric("galaxy_run_tool"),
@@ -824,7 +824,7 @@ setMethod("galaxy_run_tool", "character",
 #' @rdname galaxy_run_tool
 #' @export
 setMethod("galaxy_run_tool", "Galaxy",
-          function(x, tool_id, inputs, ...) {
+          function(x, tool_id, inputs = NULL, ...) {
             inp <- if (!is.null(inputs)) inputs else if (length(x@inputs) > 0) x@inputs else NULL
             job_id <- .galaxy_run_tool(tool_id = tool_id,
                                        history_id = x@history_id,

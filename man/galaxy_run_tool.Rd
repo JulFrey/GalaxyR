@@ -4,7 +4,13 @@
 \alias{galaxy_run_tool,Galaxy-method}
 \title{S4 Method for single tool invocation}
 \usage{
-\S4method{galaxy_run_tool}{Galaxy}(x, tool_id, inputs, galaxy_url = "https://usegalaxy.eu", ...)
+\S4method{galaxy_run_tool}{Galaxy}(
+  x,
+  tool_id,
+  inputs = NULL,
+  galaxy_url = "https://usegalaxy.eu",
+  ...
+)
 }
 \description{
 S4 Method for single tool invocation

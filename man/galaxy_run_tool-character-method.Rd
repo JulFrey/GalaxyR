@@ -4,7 +4,13 @@
 \alias{galaxy_run_tool,character-method}
 \title{Run a Galaxy tool programmatically}
 \usage{
-\S4method{galaxy_run_tool}{character}(x, tool_id, inputs, galaxy_url = "https://usegalaxy.eu", ...)
+\S4method{galaxy_run_tool}{character}(
+  x,
+  tool_id,
+  inputs = NULL,
+  galaxy_url = "https://usegalaxy.eu",
+  ...
+)
 }
 \arguments{
 \item{x}{A history ID (\code{character}) or a \code{Galaxy} object.}
