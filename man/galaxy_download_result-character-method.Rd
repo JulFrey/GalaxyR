@@ -2,56 +2,37 @@
 % Please edit documentation in R/2026-01-21_s4_class_methods.R
 \name{galaxy_download_result,character-method}
 \alias{galaxy_download_result,character-method}
-\title{Download final result dataset from Galaxy}
+\title{Download result datasets from a Galaxy history}
 \usage{
 \S4method{galaxy_download_result}{character}(
   x,
-  out_file = "result.laz",
+  out_dir = ".",
   galaxy_url = "https://usegalaxy.eu",
+  overwrite = FALSE,
   ...
 )
 }
 \arguments{
 \item{x}{A vector of HDA output IDs (\code{character}), or a \code{Galaxy} object.}
 
-\item{out_file}{Path to save the downloaded file.}
+\item{out_dir}{Directory in which to save the downloaded files.}
 
 \item{galaxy_url}{Base URL of the Galaxy instance, used by the character
-method. If \code{GALAXY_URL} is set it takes precedence.}
+method.}
+
+\item{overwrite}{Logical; if \code{FALSE} (default), do not overwrite existing
+files but choose unique names instead.}
 }
 \value{
-For the character method, the \code{httr} response object from the
-download request. For the \code{Galaxy} method, the (unchanged) \code{Galaxy}
-object invisibly.
+For the character method, a list of \code{httr} responses; for the
+\code{Galaxy} method, the (unchanged) \code{Galaxy} object invisibly.
 }
 \description{
 \code{galaxy_download_result()} is an S4 generic. With \code{x} as a character vector
-it is treated as a set of HDA output IDs; the last one is downloaded to
-\code{out_file} and the \code{httr} response is returned. With \code{x} as a \code{\link{Galaxy}}
-object, its \code{output_dataset_ids} and \code{galaxy_url} are used and the object is
-returned invisibly after performing the download.
-}
-\examples{
-\dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
-# prepare data
-tmp_dir <- tempdir()
-f_path  <- file.path(tmp_dir, "iris.csv")
-write.csv(datasets::iris, f_path, row.names = FALSE)
-
-#select workflow
-workflows    <- galaxy_list_workflows(include_public = TRUE)
-iris_workflow <- workflows[workflows$name ==
-                             "Exploring Iris dataset with statistics and scatterplots", ][1, ]
-# upload and run workflow
-gxy <- galaxy(history_name = "IRIS") |>
-  galaxy_initialize() |>
-  galaxy_upload_https(f_path) |>
-  galaxy_start_workflow(workflow_id = iris_workflow$id) |>
-  galaxy_poll_workflow() |>
-  galaxy_download_result(out_file = file.path(tmp_dir, result_files$name[nrow(result_files)]))
-
-# inspect the outputs
-result_files <- galaxy_get_file_info(gxy@output_dataset_ids)
-head(result_files)
-\dontshow{\}) # examplesIf}
+of HDA output IDs, all corresponding datasets are downloaded into \code{out_dir}
+using their Galaxy names; duplicate names are disambiguated by appending
+\verb{_<i>} before the extension. Existing files are not overwritten if
+\code{overwrite = FALSE}, and a warning is issued when a name is adjusted.
+With \code{x} as a \code{\link{Galaxy}} object its \code{output_dataset_ids} and \code{galaxy_url}
+are used; the object is returned invisibly after performing the downloads.
 }

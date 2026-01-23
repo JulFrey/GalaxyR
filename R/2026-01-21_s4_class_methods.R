@@ -432,12 +432,11 @@ setMethod("galaxy_upload_https", "Galaxy",
 #' @noRd
 .galaxy_build_wf_inputs <- function(wf_def, dataset_id = NULL, args = list()) {
   if (is.null(args)) args <- list()
-  wf_inputs <- wf_def$inputs
-
-  # if we have a dataset_id and nothing provided, bind it to the first input
-  if (!is.null(dataset_id) && !length(args) && length(wf_inputs)) {
-    first <- names(wf_inputs)[1L]
-    args[[first]] <- list(src = "hda", id = dataset_id)
+  if (!is.null(dataset_id)) {
+    wf_inputs <- names(wf_def$inputs)
+    if (!any(wf_inputs %in% names(args))) {
+      args[[wf_inputs[1L]]] <- list(src = "hda", id = dataset_id)
+    }
   }
   args
 }
@@ -446,11 +445,28 @@ setMethod("galaxy_upload_https", "Galaxy",
 #' @keywords internal
 #' @noRd
 .galaxy_validate_wf_inputs <- function(wf_def, inputs) {
+  # top–level workflow inputs
   expected <- names(wf_def$inputs)
-  unknown  <- setdiff(names(inputs), expected)
+
+  # allow overrides of tool parameters: step_id|param_name
+  step_allowed <- character()
+  if (!is.null(wf_def$steps)) {
+    for (st in wf_def$steps) {
+      if (!is.null(st$tool_id) && length(st$tool_inputs)) {
+        params <- names(st$tool_inputs)
+        step_allowed <- c(step_allowed,
+                          paste(st$id, params, sep = "|"))
+      }
+    }
+  }
+
+  allowed <- c(expected, step_allowed)
+  unknown <- setdiff(names(inputs), allowed)
   if (length(unknown)) {
     stop("Unknown workflow inputs: ", paste(unknown, collapse = ", "))
   }
+
+  ## only the true workflow inputs without defaults are required
   has_default <- function(inp) !is.null(inp$value)
   req_idx <- !vapply(wf_def$inputs,
                      function(inp) isTRUE(inp$optional) || has_default(inp),
@@ -671,94 +687,113 @@ setMethod("galaxy_poll_workflow", "Galaxy",
 ## File download
 #############################
 
-# internal helper, not exported
+#' Helper function for unique naming
+#' @keywords internal
+#' @noRd
+.make_unique_names <- function(names, out_dir, overwrite = FALSE) {
+  out <- character(length(names))
+  for (i in seq_along(names)) {
+    nm   <- names[i]
+    if (!nzchar(nm)) nm <- sprintf("dataset_%02d", i)
+    ext  <- tools::file_ext(nm)
+    base <- if (nzchar(ext)) tools::file_path_sans_ext(nm) else nm
+    cand <- nm
+    idx  <- 1L
+    while (cand %in% out ||
+           (!overwrite && file.exists(file.path(out_dir, cand)))) {
+      cand <- if (nzchar(ext)) sprintf("%s_%d.%s", base, idx, ext)
+      else sprintf("%s_%d", base, idx)
+      idx <- idx + 1L
+    }
+    if (cand != nm) {
+      warning("File '", nm, "' exists; using '", cand, "' instead.")
+    }
+    out[i] <- cand
+  }
+  out
+}
+
+#' Helper function for downloading the results of a history
 #' @keywords internal
 #' @noRd
 .galaxy_download_result <- function(output_ids,
-                                    out_file   = "result.laz",
-                                    galaxy_url = "https://usegalaxy.eu") {
-  ## allow a list with element output_ids
+                                    out_dir   = ".",
+                                    galaxy_url = "https://usegalaxy.eu",
+                                    overwrite = FALSE) {
   if (is.list(output_ids) && "output_ids" %in% names(output_ids)) {
     output_ids <- output_ids$output_ids
   }
-  api_key   <- Sys.getenv("GALAXY_API_KEY")
   galaxy_url <- .resolve_galaxy_url(galaxy_url)
-  httr::GET(
-    paste0(galaxy_url, "/api/datasets/", output_ids[length(output_ids)], "/display"),
-    httr::add_headers(`x-api-key` = api_key),
-    httr::write_disk(out_file, overwrite = TRUE)
-  )
+  api_key    <- Sys.getenv("GALAXY_API_KEY")
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+  info <- galaxy_get_file_info(output_ids, galaxy_url = galaxy_url)
+  targets <- .make_unique_names(info$name, out_dir, overwrite = overwrite)
+
+  mapply(function(fid, fname) {
+    dest <- file.path(out_dir, fname)
+    httr::GET(
+      paste0(galaxy_url, "/api/datasets/", fid, "/display"),
+      httr::add_headers(`x-api-key` = api_key),
+      httr::write_disk(dest, overwrite = TRUE)  # we've ensured uniqueness
+    )
+  }, info$id, targets, SIMPLIFY = FALSE)
 }
 
 setGeneric("galaxy_download_result",
            function(x,
-                    out_file   = "result.laz",
+                    out_dir    = ".",
                     galaxy_url = "https://usegalaxy.eu",
+                    overwrite  = FALSE,
                     ...)
              standardGeneric("galaxy_download_result"),
            signature = "x")
 
-#' Download final result dataset from Galaxy
+#' Download result datasets from a Galaxy history
 #'
 #' `galaxy_download_result()` is an S4 generic. With `x` as a character vector
-#' it is treated as a set of HDA output IDs; the last one is downloaded to
-#' `out_file` and the `httr` response is returned. With `x` as a [`Galaxy`]
-#' object, its `output_dataset_ids` and `galaxy_url` are used and the object is
-#' returned invisibly after performing the download.
+#' of HDA output IDs, all corresponding datasets are downloaded into `out_dir`
+#' using their Galaxy names; duplicate names are disambiguated by appending
+#' `_<i>` before the extension. Existing files are not overwritten if
+#' `overwrite = FALSE`, and a warning is issued when a name is adjusted.
+#' With `x` as a [`Galaxy`] object its `output_dataset_ids` and `galaxy_url`
+#' are used; the object is returned invisibly after performing the downloads.
 #'
 #' @param x A vector of HDA output IDs (`character`), or a `Galaxy` object.
-#' @param out_file Path to save the downloaded file.
+#' @param out_dir Directory in which to save the downloaded files.
 #' @param galaxy_url Base URL of the Galaxy instance, used by the character
-#'   method. If `GALAXY_URL` is set it takes precedence.
-#' @return For the character method, the `httr` response object from the
-#'   download request. For the `Galaxy` method, the (unchanged) `Galaxy`
-#'   object invisibly.
-#' @examplesIf galaxy_has_key()
-#' # prepare data
-#' tmp_dir <- tempdir()
-#' f_path  <- file.path(tmp_dir, "iris.csv")
-#' write.csv(datasets::iris, f_path, row.names = FALSE)
-#'
-#' #select workflow
-#' workflows    <- galaxy_list_workflows(include_public = TRUE)
-#' iris_workflow <- workflows[workflows$name ==
-#'                              "Exploring Iris dataset with statistics and scatterplots", ][1, ]
-#' # upload and run workflow
-#' gxy <- galaxy(history_name = "IRIS") |>
-#'   galaxy_initialize() |>
-#'   galaxy_upload_https(f_path) |>
-#'   galaxy_start_workflow(workflow_id = iris_workflow$id) |>
-#'   galaxy_poll_workflow() |>
-#'   galaxy_download_result(out_file = file.path(tmp_dir, result_files$name[nrow(result_files)]))
-#'
-#' # inspect the outputs
-#' result_files <- galaxy_get_file_info(gxy@output_dataset_ids)
-#' head(result_files)
-#'
+#'   method.
+#' @param overwrite Logical; if `FALSE` (default), do not overwrite existing
+#'   files but choose unique names instead.
+#' @return For the character method, a list of `httr` responses; for the
+#'   `Galaxy` method, the (unchanged) `Galaxy` object invisibly.
 #' @export
 setMethod("galaxy_download_result", "character",
           function(x,
-                   out_file   = "result.laz",
+                   out_dir    = ".",
                    galaxy_url = "https://usegalaxy.eu",
+                   overwrite  = FALSE,
                    ...) {
             .galaxy_download_result(output_ids = x,
-                                    out_file   = out_file,
-                                    galaxy_url = galaxy_url)
+                                    out_dir    = out_dir,
+                                    galaxy_url = galaxy_url,
+                                    overwrite  = overwrite)
           })
 
-#' S4 download function for workflow or tool outputs
+#' S4 method to download files from a history
 #' @rdname galaxy_download_result
 #' @export
 setMethod("galaxy_download_result", "Galaxy",
           function(x,
-                   out_file = "result.laz",
+                   out_dir   = ".",
+                   overwrite = FALSE,
                    ...) {
             .galaxy_download_result(output_ids = x@output_dataset_ids,
-                                    out_file   = out_file,
-                                    galaxy_url = x@galaxy_url)
+                                    out_dir    = out_dir,
+                                    galaxy_url = x@galaxy_url,
+                                    overwrite  = overwrite)
             invisible(x)
           })
-
 
 #############################
 ## Tool invocation and polling

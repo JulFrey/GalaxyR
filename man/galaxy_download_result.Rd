@@ -2,15 +2,16 @@
 % Please edit documentation in R/2026-01-21_s4_class_methods.R
 \name{galaxy_download_result,Galaxy-method}
 \alias{galaxy_download_result,Galaxy-method}
-\title{S4 download function for workflow or tool outputs}
+\title{S4 method to download files from a history}
 \usage{
 \S4method{galaxy_download_result}{Galaxy}(
   x,
-  out_file = "result.laz",
+  out_dir = ".",
   galaxy_url = "https://usegalaxy.eu",
+  overwrite = FALSE,
   ...
 )
 }
 \description{
-S4 download function for workflow or tool outputs
+S4 method to download files from a history
 }
