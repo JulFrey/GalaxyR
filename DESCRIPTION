@@ -6,6 +6,7 @@ Authors@R:
 Description: On the Galaxy platform many tools and workflows can run directly on a high performance computer. The functions in this package allow to upload data to Galaxy plattforms, invoke workflows, chaeck the status of the workflow and download the results. Credentials (GALAXY_API_KEY, GALAXY_USERNAME, GALAXY_PASSWORD) to the Galaxy platform need to be stored in the .Renviron file first.  
 License: GPL-3
 Encoding: UTF-8
-Imports: httr, jsonlite
+Imports: httr, jsonlite, methods
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+

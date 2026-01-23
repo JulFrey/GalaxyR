@@ -2,7 +2,20 @@
 ## S4 class definition and create function
 ##########################
 
-
+#' Galaxy session object
+#'
+#' An S4 class used to carry state across a pipe‑based workflow against a
+#' Galaxy instance.
+#'
+#' @slot history_name Default name to give to a new history.
+#' @slot history_id Encoded ID of the history on the server.
+#' @slot input_dataset_id Encoded ID of the last uploaded input dataset.
+#' @slot inputs A list of tool/workflow inputs to be applied on the next call.
+#' @slot invocation_id Encoded ID of the last workflow invocation.
+#' @slot output_dataset_ids Character vector of encoded output dataset IDs.
+#' @slot state One of `"new"`, `"pending"`, `"success"` or `"error"`.
+#' @slot galaxy_url Base URL of the Galaxy instance.
+#' @exportClass Galaxy
 setClass(
   "Galaxy",
   slots = list(
@@ -40,7 +53,7 @@ setValidity("Galaxy", function(object) {
   }
 
   if (object@state != "new" && !nzchar(object@galaxy_url)) {
-    return("galaxy_url must be set once the Galaxy object is initialised.")
+    return("galaxy_url must be set once the Galaxy object is initialized.")
   }
 
   TRUE
@@ -48,7 +61,9 @@ setValidity("Galaxy", function(object) {
 
 #' Create a Galaxy session object
 #'
-#' Constructor for a `Galaxy` S4 object used for pipe‑based workflows.
+#' Constructor for a `Galaxy` S4 object used for pipe‑based
+#' workflows. The returned object carries identifiers such as `history_id`,
+#' `input_dataset_id` and `invocation_id` through subsequent calls.
 #'
 #' @param history_name Character. Default name to give to a new history,
 #'   stored in the object and used by `galaxy_initialize()` if you don’t
@@ -57,6 +72,7 @@ setValidity("Galaxy", function(object) {
 #'   environment variable `GALAXY_URL` is set, it takes precedence.
 #'
 #' @return A `Galaxy` object in state `"new"`.
+#' @import methods
 #' @export
 galaxy <- function(history_name = "R API request", galaxy_url = "https://usegalaxy.eu") {
   resolved_url <- .resolve_galaxy_url(galaxy_url)
@@ -100,7 +116,7 @@ galaxy <- function(history_name = "R API request", galaxy_url = "https://usegala
 #'
 #' `galaxy_initialize()` is an S4 generic. With no `x` supplied it creates a
 #' new history on the given Galaxy instance and returns its encoded ID. When
-#' called with a [`Galaxy`] object it uses the object’s `history_name` and
+#' called with a `Galaxy` object it uses the object’s `history_name` and
 #' `galaxy_url`, creates the history, and updates the object with the new
 #' `history_id` and state `"pending"`.
 #'
@@ -120,20 +136,20 @@ galaxy <- function(history_name = "R API request", galaxy_url = "https://usegala
 #' g <- galaxy_initialize(g)
 #' @export
 setGeneric("galaxy_initialize",
-           function(x, name = "R API request", galaxy_url = "https://usegalaxy.eu", ...)
+           function(x, name = "R API request", galaxy_url = "https://usegalaxy.eu")
              standardGeneric("galaxy_initialize"),
            signature = "x")
 
 #' @rdname galaxy_initialize
 #' @export
 setMethod("galaxy_initialize", "missing",
-          function(name, galaxy_url, ...) .galaxy_initialize(name, galaxy_url))
+          function(name, galaxy_url) .galaxy_initialize(name, galaxy_url))
 
 
 #' @rdname galaxy_initialize
 #' @export
 setMethod("galaxy_initialize", "Galaxy",
-          function(x, ...) {
+          function(x) {
             x@history_id <- .galaxy_initialize(x@history_name, x@galaxy_url)
             x@state <- "pending"
             validObject(x)
@@ -188,6 +204,9 @@ setMethod("galaxy_initialize", "Galaxy",
 }
 
 ## generic with dispatch on x
+#' Generic upload ftp
+#' @rdname galaxy_upload_ftp
+#' @export
 setGeneric("galaxy_upload_ftp",
            function(x,
                     input_file,
@@ -202,7 +221,7 @@ setGeneric("galaxy_upload_ftp",
 #'
 #' `galaxy_upload_ftp()` is an S4 generic. With no `x` supplied it uploads a
 #' local file via FTP and registers it in the specified history, returning the
-#' encoded dataset ID. When called with a [`Galaxy`] object it uses the
+#' encoded dataset ID. When called with a `Galaxy` object it uses the
 #' object's `history_id` and `galaxy_url` and updates the object with the new
 #' `input_dataset_id`.
 #'
@@ -214,6 +233,7 @@ setGeneric("galaxy_upload_ftp",
 #' @param galaxy_ftp FTP server address of the Galaxy instance.
 #' @param galaxy_url Base URL of the Galaxy instance, used by the default
 #'   method. If `GALAXY_URL` is set it takes precedence.
+#' @param ... not in use
 #' @return For the default method, a character scalar dataset ID. For the
 #'   `Galaxy` method, the modified `Galaxy` object.
 #' @examplesIf galaxy_has_key() && nzchar(Sys.getenv("GALAXY_USERNAME")) && nzchar(Sys.getenv("GALAXY_PASSWORD"))
@@ -225,14 +245,15 @@ setGeneric("galaxy_upload_ftp",
 #' g <- galaxy()
 #' g <- galaxy_initialize(g)
 #' g <- galaxy_upload_ftp(g, input_file, galaxy_ftp = galaxy_ftp)
+#' @rdname galaxy_upload_ftp
 #' @export
-setMethod("galaxy_upload_ftp", "missing",
+setMethod("galaxy_upload_ftp", "character",
           function(x,
                    input_file,
                    galaxy_ftp = "ftp.usegalaxy.eu",
                    galaxy_url = "https://usegalaxy.eu",
                    ...)
-            .galaxy_upload_ftp(input_file = input_file, history_id = x, galaxy_ftp, galaxy_url))
+            .galaxy_upload_ftp(history_id = x, input_file = input_file, galaxy_ftp, galaxy_url))
 
 ## method for Galaxy objects: update the object and return it
 #' Galaxy upload via ftp S4 method
@@ -337,7 +358,9 @@ setMethod("galaxy_upload_ftp", "Galaxy",
   dataset_id
 }
 
-## generic with dispatch on the first argument
+#' Generic upload file with https
+#' @rdname galaxy_upload_https
+#' @export
 setGeneric("galaxy_upload_https",
            function(x,
                     input_file,
@@ -354,7 +377,7 @@ setGeneric("galaxy_upload_https",
 #'
 #' `galaxy_upload_https()` is an S4 generic. With no `x` supplied it uploads a
 #' local file via HTTPS to the specified history and returns the encoded dataset
-#' ID. When called with a [`Galaxy`] object it uses the object's `history_id` and
+#' ID. When called with a `Galaxy` object it uses the object's `history_id` and
 #' `galaxy_url`, uploads the file, and updates the object with the new
 #' `input_dataset_id`.
 #'
@@ -370,6 +393,7 @@ setGeneric("galaxy_upload_https",
 #'   If `GALAXY_URL` is set it takes precedence.
 #' @param file_type Galaxy datatype identifier (e.g. `"auto"`, `"fastq"`, `"bam"`).
 #' @param dbkey Reference genome identifier (e.g. `"?"` or `"hg38"`).
+#' @param ... not in use
 #' @return For the default method, a character scalar dataset ID. For the
 #'   `Galaxy` method, the modified `Galaxy` object.
 #' @examplesIf galaxy_has_key()
@@ -380,6 +404,7 @@ setGeneric("galaxy_upload_https",
 #' g <- galaxy()
 #' g <- galaxy_initialize(g)
 #' g <- galaxy_upload_https(g, test_file)
+#' @rdname galaxy_upload_https
 #' @export
 setMethod("galaxy_upload_https", "character",
           function(x,
@@ -399,7 +424,7 @@ setMethod("galaxy_upload_https", "character",
                                  dbkey      = dbkey)
           })
 
-#' S4 Method for galaxy ftp upload
+#' S4 Method for galaxy https upload
 #' @rdname galaxy_upload_https
 #' @export
 setMethod("galaxy_upload_https", "Galaxy",
@@ -506,13 +531,15 @@ setMethod("galaxy_upload_https", "Galaxy",
 }
 
 ## generic dispatches on the first argument
+#' Generic start workflow
+#' @rdname galaxy_start_workflow
+#' @export
 setGeneric("galaxy_start_workflow",
            function(x,
                     workflow_id,
                     inputs     = NULL,
                     dataset_id = NULL,
-                    galaxy_url = "https://usegalaxy.eu",
-                    ...)
+                    galaxy_url = "https://usegalaxy.eu")
              standardGeneric("galaxy_start_workflow"),
            signature = "x")
 
@@ -520,7 +547,7 @@ setGeneric("galaxy_start_workflow",
 #'
 #' `galaxy_start_workflow()` is an S4 generic. With `x` as a character vector
 #' it is treated as a history ID: the given workflow is invoked in that history
-#' and the invocation ID is returned. With `x` as a [`Galaxy`] object, the
+#' and the invocation ID is returned. With `x` as a `Galaxy` object, the
 #' history ID and URL are taken from the object; the workflow is started and
 #' the object is updated with the resulting `invocation_id`.
 #'
@@ -536,10 +563,11 @@ setGeneric("galaxy_start_workflow",
 #'   method. If `GALAXY_URL` is set it takes precedence.
 #' @return For the character method, a character scalar invocation ID. For the
 #'   `Galaxy` method, the modified `Galaxy` object.
+#' @rdname galaxy_start_workflow
 #' @export
 setMethod("galaxy_start_workflow", "character",
           function(x, workflow_id, inputs = NULL, dataset_id = NULL,
-                   galaxy_url = "https://usegalaxy.eu", ...) {
+                   galaxy_url = "https://usegalaxy.eu") {
             .galaxy_start_workflow(history_id = x,
                                    workflow_id = workflow_id,
                                    inputs      = inputs,
@@ -551,7 +579,7 @@ setMethod("galaxy_start_workflow", "character",
 #' @rdname galaxy_start_workflow
 #' @export
 setMethod("galaxy_start_workflow", "Galaxy",
-          function(x, workflow_id, inputs = NULL, dataset_id = NULL, ...) {
+          function(x, workflow_id, inputs = NULL, dataset_id = NULL) {
             inv <- .galaxy_start_workflow(history_id = x@history_id,
                                           workflow_id = workflow_id,
                                           inputs      = if (is.null(inputs)) x@inputs else inputs,
@@ -589,6 +617,7 @@ setMethod("galaxy_start_workflow", "Galaxy",
     job_ids <- job_ids[nzchar(job_ids)]
     if (!length(job_ids)) {
       message(Sys.time(), " ,No jobs yet, waiting...")
+      Sys.sleep(poll_interval)
       next
     }
 
@@ -630,6 +659,9 @@ setMethod("galaxy_start_workflow", "Galaxy",
   list(success = !any_error, output_ids = output_ids)
 }
 
+#' Generic for polling workflows
+#' @rdname galaxy_poll_workflow
+#' @export
 setGeneric("galaxy_poll_workflow",
            function(x,
                     galaxy_url    = "https://usegalaxy.eu",
@@ -643,7 +675,7 @@ setGeneric("galaxy_poll_workflow",
 #' `galaxy_poll_workflow()` is an S4 generic. With `x` as a character vector it
 #' is treated as a workflow invocation ID; the invocation is polled until it
 #' completes and a list of output dataset IDs is returned. With `x` as a
-#' [`Galaxy`] object, the `invocation_id` and `galaxy_url` are taken from the
+#' `Galaxy` object, the `invocation_id` and `galaxy_url` are taken from the
 #' object, and the object is updated with the resulting `output_dataset_ids` and
 #' state.
 #'
@@ -651,11 +683,13 @@ setGeneric("galaxy_poll_workflow",
 #' @param galaxy_url Base URL of the Galaxy instance, used by the character
 #'   method. If `GALAXY_URL` is set it takes precedence.
 #' @param poll_interval Time in seconds between polling attempts.
+#' @param ... not in use
 #' @return For the character method, a list with elements `success` and
 #'   `output_ids`. For the `Galaxy` method, the modified `Galaxy` object.
 #' @examplesIf galaxy_has_key()
 #' invocation_id <- "abc123"
 #' galaxy_poll_workflow(invocation_id)
+#' @rdname galaxy_poll_workflow
 #' @export
 setMethod("galaxy_poll_workflow", "character",
           function(x,
@@ -740,12 +774,14 @@ setMethod("galaxy_poll_workflow", "Galaxy",
   }, info$id, targets, SIMPLIFY = FALSE)
 }
 
+#' Generic for downloading files from a history
+#' @rdname galaxy_download_result
+#' @export
 setGeneric("galaxy_download_result",
            function(x,
                     out_dir    = ".",
                     galaxy_url = "https://usegalaxy.eu",
-                    overwrite  = FALSE,
-                    ...)
+                    overwrite  = FALSE)
              standardGeneric("galaxy_download_result"),
            signature = "x")
 
@@ -756,7 +792,7 @@ setGeneric("galaxy_download_result",
 #' using their Galaxy names; duplicate names are disambiguated by appending
 #' `_<i>` before the extension. Existing files are not overwritten if
 #' `overwrite = FALSE`, and a warning is issued when a name is adjusted.
-#' With `x` as a [`Galaxy`] object its `output_dataset_ids` and `galaxy_url`
+#' With `x` as a `Galaxy` object its `output_dataset_ids` and `galaxy_url`
 #' are used; the object is returned invisibly after performing the downloads.
 #'
 #' @param x A vector of HDA output IDs (`character`), or a `Galaxy` object.
@@ -767,13 +803,13 @@ setGeneric("galaxy_download_result",
 #'   files but choose unique names instead.
 #' @return For the character method, a list of `httr` responses; for the
 #'   `Galaxy` method, the (unchanged) `Galaxy` object invisibly.
+#' @rdname galaxy_download_result
 #' @export
 setMethod("galaxy_download_result", "character",
           function(x,
                    out_dir    = ".",
                    galaxy_url = "https://usegalaxy.eu",
-                   overwrite  = FALSE,
-                   ...) {
+                   overwrite  = FALSE) {
             .galaxy_download_result(output_ids = x,
                                     out_dir    = out_dir,
                                     galaxy_url = galaxy_url,
@@ -786,8 +822,7 @@ setMethod("galaxy_download_result", "character",
 setMethod("galaxy_download_result", "Galaxy",
           function(x,
                    out_dir   = ".",
-                   overwrite = FALSE,
-                   ...) {
+                   overwrite = FALSE) {
             .galaxy_download_result(output_ids = x@output_dataset_ids,
                                     out_dir    = out_dir,
                                     galaxy_url = x@galaxy_url,
@@ -885,13 +920,16 @@ setMethod("galaxy_download_result", "Galaxy",
   job$jobs[[1]]$id
 }
 
+#' Generic run tool
+#' @rdname galaxy_run_tool
+#' @export
 setGeneric("galaxy_run_tool",
            function(x,
                     tool_id,
                     inputs     = NULL,
                     dataset_id = NULL,
-                    galaxy_url = "https://usegalaxy.eu",
-                    ...)
+                    galaxy_url = "https://usegalaxy.eu"
+                    )
              standardGeneric("galaxy_run_tool"),
            signature = "x")
 
@@ -899,20 +937,24 @@ setGeneric("galaxy_run_tool",
 #'
 #' `galaxy_run_tool()` is an S4 generic. With `x` as a character vector it is
 #' treated as a history ID; the specified tool is invoked in that history and
-#' the job ID is returned. With `x` as a [`Galaxy`] object, the history ID and
+#' the job ID is returned. With `x` as a `Galaxy` object, the history ID and
 #' URL are taken from the object and the object is updated with the job ID.
 #'
 #' @param x A history ID (`character`) or a `Galaxy` object.
 #' @param tool_id Tool identifier to execute.
+#' @param dataset_id ID of the input dataset (HDA).
 #' @param inputs Named list of tool inputs.
 #' @param galaxy_url Base URL of the Galaxy instance, used by the character
 #'   method.
 #' @return For the character method, a job ID; for the `Galaxy` method, the
 #'   modified `Galaxy` object.
+#' @rdname galaxy_run_tool
 #' @export
 setMethod("galaxy_run_tool", "character",
-          function(x, tool_id, inputs = NULL, dataset_id = NULL,
-                   galaxy_url = "https://usegalaxy.eu", ...) {
+          function(x, tool_id,
+                   inputs = NULL,
+                   dataset_id = NULL,
+                   galaxy_url = "https://usegalaxy.eu") {
             .galaxy_run_tool(tool_id = tool_id,
                              history_id = x,
                              inputs = inputs,
@@ -927,8 +969,8 @@ setMethod("galaxy_run_tool", "Galaxy",
           function(x,
                    tool_id,
                    inputs     = NULL,
-                   dataset_id = NULL,
-                   ...) {
+                   dataset_id = NULL
+                   ) {
             job_id <- .galaxy_run_tool(tool_id   = tool_id,
                                        history_id = x@history_id,
                                        inputs     = if (is.null(inputs)) x@inputs else inputs,
@@ -990,12 +1032,14 @@ setMethod("galaxy_run_tool", "Galaxy",
   }
 }
 
+#' Generic for galaxy_poll_tool
+#' @rdname galaxy_poll_tool
+#' @export
 setGeneric("galaxy_poll_tool",
            function(x,
                     galaxy_url    = "https://usegalaxy.eu",
                     poll_interval = 3,
-                    timeout       = 600,
-                    ...)
+                    timeout       = 600)
              standardGeneric("galaxy_poll_tool"),
            signature = "x")
 
@@ -1008,13 +1052,13 @@ setGeneric("galaxy_poll_tool",
 #' @param timeout Maximum time to wait in seconds.
 #' @return For the character method, the final job object; for the `Galaxy`
 #'   method, the modified `Galaxy` object.
+#' @rdname galaxy_poll_tool
 #' @export
 setMethod("galaxy_poll_tool", "character",
           function(x,
                    galaxy_url    = "https://usegalaxy.eu",
                    poll_interval = 3,
-                   timeout       = 600,
-                   ...) {
+                   timeout       = 600) {
             .galaxy_poll_tool(invocation_id = x,
                               galaxy_url    = galaxy_url,
                               poll_interval = poll_interval,
@@ -1027,8 +1071,7 @@ setMethod("galaxy_poll_tool", "character",
 setMethod("galaxy_poll_tool", "Galaxy",
           function(x,
                    poll_interval = 3,
-                   timeout       = 600,
-                   ...) {
+                   timeout       = 600) {
             job <- .galaxy_poll_tool(invocation_id = x@invocation_id,
                                      galaxy_url    = x@galaxy_url,
                                      poll_interval = poll_interval,

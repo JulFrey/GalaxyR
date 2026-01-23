@@ -18,5 +18,7 @@ environment variable \code{GALAXY_URL} is set, it takes precedence.}
 A \code{Galaxy} object in state \code{"new"}.
 }
 \description{
-Constructor for a \code{Galaxy} S4 object used for pipe‑based workflows.
+Constructor for a \code{Galaxy} S4 object used for pipe‑based
+workflows. The returned object carries identifiers such as \code{history_id},
+\code{input_dataset_id} and \code{invocation_id} through subsequent calls.
 }

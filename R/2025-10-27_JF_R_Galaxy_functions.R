@@ -159,7 +159,7 @@ galaxy_get_workflow <- function(workflow_id,
 #' This function queries \code{/api/workflows/{workflow_id}} and extracts
 #' workflow input steps (data and parameter inputs). The returned
 #' \code{step_id} values must be used as names in the \code{inputs} argument
-#' of \code{\link{galaxy_start_workflow}}.
+#' of \code{galaxy_start_workflow}.
 #'
 #' @examplesIf nzchar(Sys.getenv("GALAXY_API_KEY"))
 #' \dontrun{

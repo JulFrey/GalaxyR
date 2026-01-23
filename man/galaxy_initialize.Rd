@@ -9,23 +9,12 @@
 galaxy_initialize(
   x,
   name = "R API request",
-  galaxy_url = "https://usegalaxy.eu",
-  ...
+  galaxy_url = "https://usegalaxy.eu"
 )
 
-\S4method{galaxy_initialize}{missing}(
-  x,
-  name = "R API request",
-  galaxy_url = "https://usegalaxy.eu",
-  ...
-)
+\S4method{galaxy_initialize}{missing}(name, galaxy_url)
 
-\S4method{galaxy_initialize}{Galaxy}(
-  x,
-  name = "R API request",
-  galaxy_url = "https://usegalaxy.eu",
-  ...
-)
+\S4method{galaxy_initialize}{Galaxy}(x)
 }
 \arguments{
 \item{x}{A \code{Galaxy} object, or missing to use the default method.}
@@ -43,7 +32,7 @@ For the \code{Galaxy} method, the modified \code{Galaxy} object.
 \description{
 \code{galaxy_initialize()} is an S4 generic. With no \code{x} supplied it creates a
 new history on the given Galaxy instance and returns its encoded ID. When
-called with a \code{\link{Galaxy}} object it uses the object’s \code{history_name} and
+called with a \code{Galaxy} object it uses the object’s \code{history_name} and
 \code{galaxy_url}, creates the history, and updates the object with the new
 \code{history_id} and state \code{"pending"}.
 }

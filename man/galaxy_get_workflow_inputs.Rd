@@ -24,7 +24,7 @@ Retrieves and summarizes the input steps required by a Galaxy workflow.
 This function queries \code{/api/workflows/{workflow_id}} and extracts
 workflow input steps (data and parameter inputs). The returned
 \code{step_id} values must be used as names in the \code{inputs} argument
-of \code{\link{galaxy_start_workflow}}.
+of \code{galaxy_start_workflow}.
 }
 \examples{
 \dontshow{if (nzchar(Sys.getenv("GALAXY_API_KEY"))) withAutoprint(\{ # examplesIf}
