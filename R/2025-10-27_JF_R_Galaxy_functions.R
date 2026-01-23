@@ -115,6 +115,33 @@ galaxy_list_workflows <- function(
   )
 }
 
+
+#' Receive workflow metadata from the API
+#'
+#' @param workflow_id Character. Galaxy workflow ID.
+#' @param galaxy_url Character. Base URL of the Galaxy instance
+#'   (for example \code{"https://usegalaxy.eu"}).
+#'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
+#'
+#' @returns a structured list with all metadata
+#' @export
+#'
+#' @examplesIf nzchar(Sys.getenv("GALAXY_API_KEY"))
+#' \dontrun{
+#' galaxy_get_workflow("f2db41e1fa331b3e")
+#' }
+galaxy_get_workflow <- function(workflow_id,
+                                galaxy_url = "https://usegalaxy.eu") {
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  url <- paste0(galaxy_url, "/api/workflows/", workflow_id)
+  res <- httr::GET(url,
+                   httr::add_headers(`x-api-key` = api_key),
+                   query = list(io_details = "true"))
+  httr::stop_for_status(res)
+  httr::content(res, "parsed")
+}
+
 #' Retrieve input definitions for a Galaxy workflow
 #'
 #' Retrieves and summarizes the input steps required by a Galaxy workflow.

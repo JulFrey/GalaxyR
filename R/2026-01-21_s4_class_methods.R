@@ -427,55 +427,74 @@ setMethod("galaxy_upload_https", "Galaxy",
 ## Workflow invocation and polling
 #########################
 
+#' Internal helper to build workflow inputs
+#' @keywords internal
+#' @noRd
+.galaxy_build_wf_inputs <- function(wf_def, dataset_id = NULL, args = list()) {
+  if (is.null(args)) args <- list()
+  wf_inputs <- wf_def$inputs
+
+  # if we have a dataset_id and nothing provided, bind it to the first input
+  if (!is.null(dataset_id) && !length(args) && length(wf_inputs)) {
+    first <- names(wf_inputs)[1L]
+    args[[first]] <- list(src = "hda", id = dataset_id)
+  }
+  args
+}
+
+#' Internal helper to validate workflow inputs
+#' @keywords internal
+#' @noRd
+.galaxy_validate_wf_inputs <- function(wf_def, inputs) {
+  expected <- names(wf_def$inputs)
+  unknown  <- setdiff(names(inputs), expected)
+  if (length(unknown)) {
+    stop("Unknown workflow inputs: ", paste(unknown, collapse = ", "))
+  }
+  has_default <- function(inp) !is.null(inp$value)
+  req_idx <- !vapply(wf_def$inputs,
+                     function(inp) isTRUE(inp$optional) || has_default(inp),
+                     logical(1L))
+  required <- expected[req_idx]
+  missing  <- setdiff(required, names(inputs))
+  if (length(missing)) {
+    stop("Missing required workflow inputs: ", paste(missing, collapse = ", "))
+  }
+  invisible(TRUE)
+}
+
 # internal helper, not exported
 #' @keywords internal
 #' @noRd
-.galaxy_start_workflow <- function(
-    history_id,
-    dataset_id,
-    workflow_id,
-    inputs    = NULL,
-    galaxy_url = "https://usegalaxy.eu"
-) {
+.galaxy_start_workflow <- function(history_id,
+                                   workflow_id,
+                                   inputs     = NULL,
+                                   dataset_id = NULL,
+                                   galaxy_url = "https://usegalaxy.eu") {
   if (missing(workflow_id) || !nzchar(workflow_id)) {
     stop("workflow_id is required.")
   }
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-  api_key <- Sys.getenv("GALAXY_API_KEY")
-  if (!nzchar(api_key)) {
-    stop("GALAXY_API_KEY environment variable is not set.")
-  }
-  if (is.null(inputs)) {
-    if (missing(dataset_id) || !nzchar(dataset_id)) {
-      stop("Either dataset_id or inputs must be provided.")
-    }
-    inputs <- setNames(list(list(src = "hda", id = dataset_id)), "0")
-  }
-  run_body <- list(inputs = inputs)
-  if (!is.na(history_id)) {
-    run_body$history_id <- history_id
-  }
-  run_url <- paste0(galaxy_url, "/api/workflows/", workflow_id, "/invocations")
-  res <- httr::POST(
-    run_url,
-    httr::add_headers(
-      `x-api-key`    = api_key,
-      `Content-Type` = "application/json"
-    ),
-    body = jsonlite::toJSON(run_body, auto_unbox = TRUE)
-  )
+  wf_def   <- galaxy_get_workflow(workflow_id, galaxy_url = galaxy_url)
+  built_in <- .galaxy_build_wf_inputs(wf_def, dataset_id = dataset_id, args = inputs)
+  .galaxy_validate_wf_inputs(wf_def, built_in)
+
+  run_body <- list(inputs = built_in, history_id = history_id)
+  run_url  <- paste0(.resolve_galaxy_url(galaxy_url),
+                     "/api/workflows/", workflow_id, "/invocations")
+  res <- httr::POST(run_url,
+                    httr::add_headers(`x-api-key` = Sys.getenv("GALAXY_API_KEY"),
+                                      `Content-Type` = "application/json"),
+                    body = jsonlite::toJSON(run_body, auto_unbox = TRUE))
   httr::stop_for_status(res)
-  inv <- httr::content(res, as = "parsed")
-  message("Workflow invocation ID: ", inv$id)
-  inv$id
+  httr::content(res, "parsed")$id
 }
 
 ## generic dispatches on the first argument
 setGeneric("galaxy_start_workflow",
            function(x,
                     workflow_id,
-                    dataset_id,
                     inputs     = NULL,
+                    dataset_id = NULL,
                     galaxy_url = "https://usegalaxy.eu",
                     ...)
              standardGeneric("galaxy_start_workflow"),
@@ -503,37 +522,27 @@ setGeneric("galaxy_start_workflow",
 #'   `Galaxy` method, the modified `Galaxy` object.
 #' @export
 setMethod("galaxy_start_workflow", "character",
-          function(x,
-                   workflow_id,
-                   dataset_id,
-                   inputs     = NULL,
-                   galaxy_url = "https://usegalaxy.eu",
-                   ...) {
+          function(x, workflow_id, inputs = NULL, dataset_id = NULL,
+                   galaxy_url = "https://usegalaxy.eu", ...) {
             .galaxy_start_workflow(history_id = x,
-                                   dataset_id = dataset_id,
                                    workflow_id = workflow_id,
-                                   inputs     = inputs,
-                                   galaxy_url = galaxy_url)
+                                   inputs      = inputs,
+                                   dataset_id  = dataset_id,
+                                   galaxy_url  = galaxy_url)
           })
 
 #' S4 function to start a galaxy workflow
 #' @rdname galaxy_start_workflow
 #' @export
 setMethod("galaxy_start_workflow", "Galaxy",
-          function(x,
-                   workflow_id,
-                   dataset_id,
-                   inputs = NULL,
-                   ...) {
-            hid <- x@history_id
-            ds  <- if (!missing(dataset_id)) dataset_id else x@input_dataset_id
-            inp <- if (!is.null(inputs)) inputs else if (length(x@inputs) > 0) x@inputs else NULL
-            inv <- .galaxy_start_workflow(history_id = hid,
-                                          dataset_id = ds,
+          function(x, workflow_id, inputs = NULL, dataset_id = NULL, ...) {
+            inv <- .galaxy_start_workflow(history_id = x@history_id,
                                           workflow_id = workflow_id,
-                                          inputs     = inp,
-                                          galaxy_url = x@galaxy_url)
+                                          inputs      = if (is.null(inputs)) x@inputs else inputs,
+                                          dataset_id  = if (is.null(dataset_id)) x@input_dataset_id else dataset_id,
+                                          galaxy_url  = x@galaxy_url)
             x@invocation_id <- inv
+            x@state <- "pending"
             validObject(x)
             x
           })
@@ -755,42 +764,97 @@ setMethod("galaxy_download_result", "Galaxy",
 ## Tool invocation and polling
 #############################
 
+# build an inputs list from a tool definition, a dataset id and a user list
+#' @keywords internal
+#' @noRd
+.galaxy_build_tool_inputs <- function(tool_def,
+                                      dataset_id = NULL,
+                                      args = list()) {
+  if (is.null(args)) args <- list()
+
+  ## find the first data parameter in the tool definition
+  param_defs <- tool_def$inputs
+  data_param <- NULL
+  if (!is.null(dataset_id)) {
+    for (p in param_defs) {
+      if (!is.null(p$type) && p$type == "data") {
+        data_param <- p$name
+        break
+      }
+    }
+  }
+
+  ## if no data input supplied and we have a dataset id, insert it
+  if (!is.null(data_param) && is.null(args[[data_param]])) {
+    args[[data_param]] <- list(src = "hda", id = dataset_id)
+  }
+
+  args
+}
+
+# very basic name‑based validation
+#' @keywords internal
+#' @noRd
+.galaxy_validate_tool_inputs <- function(tool_def, inputs) {
+  expected <- vapply(tool_def$inputs, function(p) p$name, character(1L))
+  unknown  <- setdiff(names(inputs), expected)
+  if (length(unknown)) {
+    stop("Unknown tool inputs: ", paste(unknown, collapse = ", "))
+  }
+
+  has_default <- function(p) {
+    !is.null(p$value) && !(is.list(p$value) && length(p$value) == 0L)
+  }
+
+  req_idx <- !vapply(tool_def$inputs,
+                     function(p) isTRUE(p$optional) || has_default(p),
+                     logical(1L))
+  required <- expected[req_idx]
+  missing  <- setdiff(required, names(inputs))
+  if (length(missing)) {
+    stop("Missing required inputs: ", paste(missing, collapse = ", "))
+  }
+  invisible(TRUE)
+}
+
 #' Helper function for single tool invocations
 #' @keywords internal
 #' @noRd
-.galaxy_run_tool <- function(tool_id, history_id, inputs,
+.galaxy_run_tool <- function(tool_id,
+                             history_id,
+                             inputs = NULL,
+                             dataset_id = NULL,
                              galaxy_url = "https://usegalaxy.eu") {
   galaxy_url <- .resolve_galaxy_url(galaxy_url)
   if (missing(tool_id) || !nzchar(tool_id)) stop("tool_id is required.")
   if (missing(history_id) || !nzchar(history_id)) stop("history_id is required.")
-  if (missing(inputs) || !is.list(inputs)) stop("inputs must be a named list.")
+
+  tool_def <- galaxy_get_tool(tool_id, galaxy_url = galaxy_url, tool_version = NULL)
+  built    <- .galaxy_build_tool_inputs(tool_def, dataset_id = dataset_id, args = inputs)
+  .galaxy_validate_tool_inputs(tool_def, built)
 
   api_key <- Sys.getenv("GALAXY_API_KEY")
   if (!nzchar(api_key)) stop("GALAXY_API_KEY environment variable is not set.")
-
-  payload <- list(
-    history_id = history_id,
-    tool_id = tool_id,
-    inputs = inputs
-  )
+  payload <- list(history_id = history_id, tool_id = tool_id, inputs = built)
 
   res <- httr::POST(
     url = paste0(galaxy_url, "/api/tools"),
     httr::add_headers(
-      `x-api-key` = api_key,
+      `x-api-key`   = api_key,
       `Content-Type` = "application/json"
     ),
     body = jsonlite::toJSON(payload, auto_unbox = TRUE)
   )
   httr::stop_for_status(res)
   job <- httr::content(res, as = "parsed", simplifyVector = FALSE)
-  return(job$jobs[[1]]$id)
+  job$jobs[[1]]$id
 }
 
 setGeneric("galaxy_run_tool",
            function(x,
                     tool_id,
-                    inputs = NULL,
+                    inputs     = NULL,
+                    dataset_id = NULL,
                     galaxy_url = "https://usegalaxy.eu",
                     ...)
              standardGeneric("galaxy_run_tool"),
@@ -812,11 +876,12 @@ setGeneric("galaxy_run_tool",
 #'   modified `Galaxy` object.
 #' @export
 setMethod("galaxy_run_tool", "character",
-          function(x, tool_id, inputs,
+          function(x, tool_id, inputs = NULL, dataset_id = NULL,
                    galaxy_url = "https://usegalaxy.eu", ...) {
             .galaxy_run_tool(tool_id = tool_id,
                              history_id = x,
                              inputs = inputs,
+                             dataset_id = dataset_id,
                              galaxy_url = galaxy_url)
           })
 
@@ -824,11 +889,15 @@ setMethod("galaxy_run_tool", "character",
 #' @rdname galaxy_run_tool
 #' @export
 setMethod("galaxy_run_tool", "Galaxy",
-          function(x, tool_id, inputs = NULL, ...) {
-            inp <- if (!is.null(inputs)) inputs else if (length(x@inputs) > 0) x@inputs else NULL
-            job_id <- .galaxy_run_tool(tool_id = tool_id,
+          function(x,
+                   tool_id,
+                   inputs     = NULL,
+                   dataset_id = NULL,
+                   ...) {
+            job_id <- .galaxy_run_tool(tool_id   = tool_id,
                                        history_id = x@history_id,
-                                       inputs = inp,
+                                       inputs     = if (is.null(inputs)) x@inputs else inputs,
+                                       dataset_id = if (is.null(dataset_id)) x@input_dataset_id else dataset_id,
                                        galaxy_url = x@galaxy_url)
             x@invocation_id <- job_id
             validObject(x)

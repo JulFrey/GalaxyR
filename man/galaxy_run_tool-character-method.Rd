@@ -8,6 +8,7 @@
   x,
   tool_id,
   inputs = NULL,
+  dataset_id = NULL,
   galaxy_url = "https://usegalaxy.eu",
   ...
 )

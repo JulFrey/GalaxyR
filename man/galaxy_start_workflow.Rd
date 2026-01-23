@@ -7,8 +7,8 @@
 \S4method{galaxy_start_workflow}{Galaxy}(
   x,
   workflow_id,
-  dataset_id,
   inputs = NULL,
+  dataset_id = NULL,
   galaxy_url = "https://usegalaxy.eu",
   ...
 )

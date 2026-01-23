@@ -7,8 +7,8 @@
 \S4method{galaxy_start_workflow}{character}(
   x,
   workflow_id,
-  dataset_id,
   inputs = NULL,
+  dataset_id = NULL,
   galaxy_url = "https://usegalaxy.eu",
   ...
 )
@@ -19,12 +19,12 @@ method.}
 
 \item{workflow_id}{Character. Galaxy workflow ID.}
 
+\item{inputs}{Named list. Optional workflow input mapping; keys are workflow
+input step IDs, values are lists describing datasets/parameters.}
+
 \item{dataset_id}{Character. ID of the input dataset (HDA). Ignored if
 \code{inputs} is supplied. When \code{x} is a \code{Galaxy} and \code{dataset_id} is missing,
 \code{x@input_dataset_id} is used.}
-
-\item{inputs}{Named list. Optional workflow input mapping; keys are workflow
-input step IDs, values are lists describing datasets/parameters.}
 
 \item{galaxy_url}{Base URL of the Galaxy instance, used by the character
 method. If \code{GALAXY_URL} is set it takes precedence.}
