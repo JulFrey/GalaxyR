@@ -39,7 +39,7 @@ Delete a dataset (HDA) from a Galaxy instance using the Galaxy API.
 }
 \details{
 This function performs an HTTP DELETE against the Galaxy
-/api/datasets/\if{html}{\out{<id>}} endpoint. By default it requests a purge
+/api/datasets/id endpoint. By default it requests a purge
 (permanent removal) by adding ?purge=true. The Galaxy API key is
 read from the environment variable \code{GALAXY_API_KEY}.
 \itemize{

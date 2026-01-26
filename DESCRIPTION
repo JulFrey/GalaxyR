@@ -1,14 +1,17 @@
 Package: GalaxyR
-Title: Galaxy API Implementation to run Workflows
-Version: 0.0.0.9000
+Title: Galaxy API Implementation to Run Workflows
+Version: 0.0.0.900
 Authors@R: c(
   person("Julian", "Frey", email = "julian.frey@wwd.uni-freiburg.de", role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7895-702X")),
   person("Zoe", "Schindler", email = "zoe.schindler@wwd.uni-freiburg.de", role = c("ctb"), comment = c(ORCID = "0000-0003-2972-1920"))
   )
-Description: On the Galaxy platform many tools and workflows can run directly on a high performance computer. The functions in this package allow to upload data to Galaxy plattforms, invoke workflows, check the status of the workflow and download the results. Credentials (GALAXY_API_KEY, GALAXY_USERNAME, GALAXY_PASSWORD) to the Galaxy platform should be stored in the .Renviron file first.  
+Description: On the Galaxy platform, many tools and workflows can run directly on a high-performance computer. 'GalaxyR' connects R with Galaxy platforms and allows credential management, uploading data, invoking workflows or tools, checking their status, and downloading results. 
+URL: https://github.com/JulFrey/GalaxyR
+BugReports: https://github.com/JulFrey/GalaxyR/issues
 License: GPL-3
 Encoding: UTF-8
 Imports: httr, jsonlite, methods
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+Depends: R (>= 4.1.0)
 
