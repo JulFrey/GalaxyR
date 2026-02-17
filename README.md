@@ -27,7 +27,12 @@ This package is designed for **automation, reproducibility, and scripting**, not
 
 ## Installation
 
-This package is not yet on CRAN. Install directly from GitHub:
+Install this package fron CRAN:
+```
+install.packages("GalaxyR")
+```
+
+Or install the latest version directly from GitHub:
 
 ``` r
 # install.packages("remotes")

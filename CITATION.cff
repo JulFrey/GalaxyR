@@ -1,0 +1,32 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: GalaxyR
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Julian
+    family-names: Frey
+    email: julian.frey@wwd.uni-freiburg.de
+    orcid: 'https://orcid.org/0000-0001-7895-702X'
+    affiliation: >-
+      Freiburg University, Chair of Forest Growth and
+      Dendroecology
+repository-code: 'https://github.com/JulFrey/GalaxyR'
+abstract: >-
+  On the Galaxy platform, many tools and workflows can run
+  directly on a high-performance computer. 'GalaxyR'
+  connects R with Galaxy platforms and allows credential
+  management, uploading data, invoking workflows or tools,
+  checking their status, and downloading results. 
+keywords:
+  - galaxy
+  - API
+  - life sciences
+license: GPL-3.0
+commit: 5af559b9282094077aa09b821f8c6820ffe56ac3
+version: 0.1.0
+date-released: '2026-01-27'
