@@ -830,6 +830,128 @@ setMethod("galaxy_download_result", "Galaxy",
             invisible(x)
           })
 
+
+#' @keywords internal
+#' @noRd
+.galaxy_download_rocrate <- function(history_id,
+                                     dest_file     = tempfile(fileext = ".zip"),
+                                     galaxy_url    = "https://usegalaxy.eu",
+                                     format        = "rocrate.zip",
+                                     poll_interval = 30,
+                                     timeout       = 600) {
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+  api_key    <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) stop("GALAXY_API_KEY is not set.")
+  start_time <- Sys.time()
+
+  # request a short-term storage export in RO-Crate format
+  prep <- httr::POST(
+    paste0(galaxy_url, "/api/histories/", history_id, "/prepare_store_download"),
+    httr::add_headers(`x-api-key` = api_key,
+                      `Content-Type` = "application/json"),
+    body = jsonlite::toJSON(list(model_store_format = format), auto_unbox = TRUE)
+  )
+  httr::stop_for_status(prep)
+  prep_info   <- httr::content(prep, "parsed")
+  storage_id  <- prep_info$storage_request_id %||% prep_info$id
+
+  # poll until the export is ready
+  repeat {
+    ready <- httr::GET(
+      paste0(galaxy_url, "/api/short_term_storage/", storage_id, "/ready"),
+      httr::add_headers(`x-api-key` = api_key)
+    )
+    httr::stop_for_status(ready)
+    if (isTRUE(httr::content(ready, "parsed"))) break
+    if (as.numeric(difftime(Sys.time(), start_time, units = "secs")) > timeout) {
+      stop("Timed out waiting for RO-Crate export.")
+    }
+    Sys.sleep(poll_interval)
+  }
+
+  # download the crate
+  httr::GET(
+    paste0(galaxy_url, "/api/short_term_storage/", storage_id),
+    httr::add_headers(`x-api-key` = api_key),
+    httr::write_disk(dest_file, overwrite = TRUE)
+  )
+  message("RO-Crate downloaded to: ", dest_file)
+  return(dest_file)
+}
+
+#' Generic for downloading a history as an RO-Crate
+#' @rdname galaxy_download_rocrate
+#' @export
+setGeneric("galaxy_download_rocrate",
+           function(x,
+                    dest_file     = tempfile(fileext = ".zip"),
+                    galaxy_url    = "https://usegalaxy.eu",
+                    format        = "rocrate.zip",
+                    poll_interval = 5,
+                    timeout       = 600)
+             standardGeneric("galaxy_download_rocrate"),
+           signature = "x")
+
+#' Download a Galaxy history as an RO-Crate
+#'
+#' `galaxy_download_rocrate()` is an S4 generic. With `x` as a history ID
+#' (`character`) it requests an export in RO-Crate format, polls until ready,
+#' and downloads the archive to `dest_file`. With `x` as a `Galaxy` object,
+#' its `history_id` and `galaxy_url` are used and the object is returned
+#' invisibly after performing the download.
+#'
+#' @param x A history ID (`character`), or a `Galaxy` object.
+#' @param dest_file Path to save the downloaded RO-Crate (defaults to a
+#'   temporary `.zip` file).
+#' @param galaxy_url Base URL of the Galaxy instance, used by the character
+#'   method. If `GALAXY_URL` is set it takes precedence.
+#' @param format Format for the history export. Possible formats depend on the Galaxy
+#' server. Typical inputs are 'tgz', 'tar', 'tar.gz', 'bag.zip', 'bag.tar', 'bag.tgz',
+#' 'rocrate.zip' or 'bco.json'. Defaults to 'rocrate.zip'.
+#' @param poll_interval Seconds between status checks.
+#' @param timeout Maximum time to wait in seconds before giving up.
+#' @return For the character method, the path to the downloaded file. For the
+#'   `Galaxy` method, the (unchanged) `Galaxy` object invisibly.
+#' @examplesIf galaxy_has_key()
+#' hid <- "0123456789abcdef"
+#' crate <- galaxy_download_rocrate(hid, dest_file = "history_rocrate.zip")
+#' g <- galaxy()
+#' g <- galaxy_initialize(g)
+#' g <- galaxy_download_rocrate(g, dest_file = "history_rocrate.zip")
+#' @rdname galaxy_download_rocrate
+#' @export
+setMethod("galaxy_download_rocrate", "character",
+          function(x,
+                   dest_file     = tempfile(fileext = ".zip"),
+                   galaxy_url    = "https://usegalaxy.eu",
+                   format        = "rocrate.zip",
+                   poll_interval = 30,
+                   timeout       = 600) {
+            .galaxy_download_rocrate(history_id = x,
+                                     dest_file     = dest_file,
+                                     galaxy_url    = galaxy_url,
+                                     format        =  format,
+                                     poll_interval = poll_interval,
+                                     timeout       = timeout)
+          })
+
+#' @rdname galaxy_download_rocrate
+#' @export
+setMethod("galaxy_download_rocrate", "Galaxy",
+          function(x,
+                   dest_file     = tempfile(fileext = ".zip"),
+                   format        =  format,
+                   poll_interval = 5,
+                   timeout       = 600) {
+            .galaxy_download_rocrate(history_id = x@history_id,
+                                     dest_file     = dest_file,
+                                     galaxy_url    = x@galaxy_url,
+                                     poll_interval = poll_interval,
+                                     timeout       = timeout)
+            invisible(x)
+          })
+
+
 #############################
 ## Tool invocation and polling
 #############################
@@ -1084,3 +1206,5 @@ setMethod("galaxy_poll_tool", "Galaxy",
             validObject(x)
             x
           })
+
+
