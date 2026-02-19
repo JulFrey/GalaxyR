@@ -28,7 +28,7 @@ This package is designed for **automation, reproducibility, and scripting**, not
 ## Installation
 
 Install this package from CRAN:
-```
+``` r
 install.packages("GalaxyR")
 ```
 
@@ -54,7 +54,7 @@ galaxy_set_credentials("your-secret-key")
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
 
-```         
+``` r       
 #usethis::edit_r_environ()
 GALAXY_API_KEY = your-secret-key
 ```
@@ -67,8 +67,8 @@ Restart R after editing`.Renviron`.
 
 The default Galaxy instance is:
 
-```         
-https://usegalaxy.eu
+``` r
+"https://usegalaxy.eu"
 ```
 
 Most functions accept a `galaxy_url` argument if you want to target a different Galaxy server.
