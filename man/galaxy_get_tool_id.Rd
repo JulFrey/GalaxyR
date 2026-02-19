@@ -39,7 +39,6 @@ Retrieve Galaxy tool IDs by name
 }
 \examples{
 \dontshow{if (galaxy_has_key()) withAutoprint(\{ # examplesIf}
-
 # Fetch the full tool list once, then lookup
 tools <- galaxy_list_tools()
 galaxy_get_tool_id("FastQC", tools = tools)
@@ -50,6 +49,5 @@ galaxy_get_tool_id("FastQC")
 # Exact, case-sensitive match inside a specific panel
 galaxy_get_tool_id("Concatenate datasets",
 ignore_case = FALSE, panel_id = "Text Manipulation")
-
 \dontshow{\}) # examplesIf}
 }

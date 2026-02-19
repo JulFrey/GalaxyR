@@ -11,7 +11,7 @@ galaxy_get_tool(
 )
 }
 \arguments{
-\item{tool_id}{Character. The Galaxy tool identifier (for example
+\item{tool_id}{Character. The Galaxy tool ID (for example
 \code{"toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73"}).}
 
 \item{galaxy_url}{Character. Base URL of the Galaxy instance

@@ -12,7 +12,7 @@ galaxy_list_histories(galaxy_url = "https://usegalaxy.eu")
 If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 }
 \value{
-data.frame with columns: name, history_id
+data.frame with columns: history_name, history_id
 }
 \description{
 List Galaxy histories (name and history id)

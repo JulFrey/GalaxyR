@@ -236,11 +236,6 @@ galaxy_get_workflow_inputs <- function(
   do.call(rbind, inputs)
 }
 
-# Helper to trim trailing slash
-.rtrim <- function(x, char = "/") {
-  sub(paste0(char, "+$"), "", x)
-}
-
 #' Delete a Galaxy dataset by ID
 #'
 #' Delete a dataset (HDA) from a Galaxy instance using the Galaxy API.
@@ -375,7 +370,7 @@ galaxy_delete_datasets <- function(output_ids, purge = TRUE, sleep = 0.2, galaxy
 #' @param galaxy_url Character. Base URL of the Galaxy instance
 #'   (for example \code{"https://usegalaxy.eu"}).
 #'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#' @return data.frame with columns: name, history_id
+#' @return data.frame with columns: history_name, history_id
 #'
 #' @examplesIf galaxy_has_key()
 #' histories <- galaxy_list_histories()
@@ -425,11 +420,11 @@ galaxy_list_histories <- function(galaxy_url = "https://usegalaxy.eu") {
 
 #' List workflow invocations for a given workflow
 #'
-#' @param workflow_id The Galaxy workflow id to list invocations for
+#' @param workflow_id The Galaxy workflow ID to list invocations for.
 #' @param galaxy_url Character. Base URL of the Galaxy instance
 #'   (for example \code{"https://usegalaxy.eu"}).
 #'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
-#' @return data.frame with columns: invocation_id, workflow_id, history_id, state, create_time, update_time
+#' @return data.frame with columns: invocation_id, workflow_id, history_id, state, create_time, update_time, stringsAsFactors
 #' @export
 galaxy_list_invocations <- function(workflow_id, galaxy_url = "https://usegalaxy.eu") {
   if (missing(workflow_id) || identical(workflow_id, "") ) {
@@ -496,7 +491,7 @@ galaxy_list_invocations <- function(workflow_id, galaxy_url = "https://usegalaxy
 #' different Galaxy versions). Results are returned as a data.frame with
 #' bytes and a human-readable size.
 #'
-#' @param history_id Galaxy history id (required)
+#' @param history_id Galaxy history ID.
 #' @param galaxy_url Character. Base URL of the Galaxy instance
 #'   (for example \code{"https://usegalaxy.eu"}).
 #'   If the environment variable \code{GALAXY_URL} is set, it takes precedence.
@@ -805,7 +800,7 @@ galaxy_list_tools <- function(galaxy_url = "https://usegalaxy.eu",
 
 #' Retrieve detailed metadata for a Galaxy tool
 #'
-#' @param tool_id Character. The Galaxy tool identifier (for example
+#' @param tool_id Character. The Galaxy tool ID (for example
 #'   \code{"toolshed.g2.bx.psu.edu/repos/devteam/fastqc/fastqc/0.73"}).
 #' @param galaxy_url Character. Base URL of the Galaxy instance
 #'   (for example \code{"https://usegalaxy.eu"}).
@@ -866,7 +861,6 @@ galaxy_get_tool <- function(tool_id,
 #'   if no tools match.
 #'
 #' @examplesIf galaxy_has_key()
-#'
 #' # Fetch the full tool list once, then lookup
 #' tools <- galaxy_list_tools()
 #' galaxy_get_tool_id("FastQC", tools = tools)
@@ -877,7 +871,6 @@ galaxy_get_tool <- function(tool_id,
 #' # Exact, case-sensitive match inside a specific panel
 #' galaxy_get_tool_id("Concatenate datasets",
 #' ignore_case = FALSE, panel_id = "Text Manipulation")
-#'
 #'
 #' @export
 galaxy_get_tool_id <- function(name,
@@ -924,7 +917,7 @@ galaxy_get_tool_id <- function(name,
 #' @return
 #' A data.frame with one row per dataset and the columns:
 #' \code{id}, \code{name}, \code{size_bytes}, \code{human_size},
-#' \code{file_type}, \code{state}, \code{deleted}.
+#' \code{file_type}, \code{state}, \code{deleted}, \code{stringsAsFactors}.
 #'
 #' @details
 #' This function queries the \code{/api/datasets/{id}} endpoint for each
