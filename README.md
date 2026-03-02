@@ -110,7 +110,9 @@ gxy <- galaxy(history_name = "add line example") |> # S4 class with history name
   galaxy_download_result(outdir)
 
 # Inspect the result
-readLines(list.files(outdir, full.names = TRUE)[1])
+# Inspect the result
+results <- list.files(outdir, full.names = TRUE)
+readLines(results[grep("Add line to file", results)])
 ```
 
 ------------------------------------------------------------------------
