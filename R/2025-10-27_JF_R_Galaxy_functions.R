@@ -277,7 +277,7 @@ galaxy_get_workflow_inputs <- function(
 #' input_file <- tempfile(fileext = ".txt")
 #' test_text <- "This is an example \nfile."
 #' writeLines(test_text,input_file)
-#' history_id <- galaxy_initialize("test upload")
+#' history_id <- galaxy_initialize()
 #' dataset_id <- galaxy_upload_https(input_file, history_id)
 #'
 #' galaxy_delete_dataset(dataset_id)

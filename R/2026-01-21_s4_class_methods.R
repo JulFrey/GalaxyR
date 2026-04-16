@@ -724,10 +724,20 @@ setMethod("galaxy_poll_workflow", "Galaxy",
 #' Helper function for unique naming
 #' @keywords internal
 #' @noRd
-.make_unique_names <- function(names, out_dir, overwrite = FALSE) {
+.make_unique_names <- function(names, out_dir, overwrite = FALSE, exts = NULL) {
   out <- character(length(names))
   for (i in seq_along(names)) {
     nm   <- names[i]
+    nm   <- gsub("[~/:\\\\?\"<>|]", "_", nm)
+
+    ## append an expected extension if provided and not already present
+    if (!is.null(exts)) {
+      ext_now <- tools::file_ext(nm)
+      if (nzchar(exts[i]) && exts[i] != ext_now) {
+        nm <- paste0(nm, ".", exts[i])
+      }
+    }
+
     if (!nzchar(nm)) nm <- sprintf("dataset_%02d", i)
     ext  <- tools::file_ext(nm)
     base <- if (nzchar(ext)) tools::file_path_sans_ext(nm) else nm
@@ -747,6 +757,7 @@ setMethod("galaxy_poll_workflow", "Galaxy",
   out
 }
 
+
 #' Helper function for downloading the results of a history
 #' @keywords internal
 #' @noRd
@@ -762,7 +773,7 @@ setMethod("galaxy_poll_workflow", "Galaxy",
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
   info <- galaxy_get_file_info(output_ids, galaxy_url = galaxy_url)
-  targets <- .make_unique_names(info$name, out_dir, overwrite = overwrite)
+  targets <- .make_unique_names(info$name, out_dir, overwrite = overwrite, info$file_type)
 
   mapply(function(fid, fname) {
     dest <- file.path(out_dir, fname)
