@@ -167,74 +167,55 @@ galaxy_get_workflow <- function(workflow_id,
 #' }
 #'
 #' @export
-galaxy_get_workflow_inputs <- function(
-    workflow_id,
-    galaxy_url = "https://usegalaxy.eu"
-) {
-
+galaxy_get_workflow_inputs2 <- function (workflow_id, galaxy_url = "https://usegalaxy.eu")
+{
   if (missing(workflow_id) || !nzchar(workflow_id)) {
     stop("workflow_id is required.")
   }
-
-  galaxy_url <- .resolve_galaxy_url(galaxy_url)
-
+  galaxy_url <- GalaxyR:::.resolve_galaxy_url(galaxy_url)
   api_key <- Sys.getenv("GALAXY_API_KEY")
   if (!nzchar(api_key)) {
     stop("GALAXY_API_KEY environment variable is not set.")
   }
-
-  res <- httr::GET(
-    url = paste0(galaxy_url, "/api/workflows/", workflow_id),
-    httr::add_headers(`x-api-key` = api_key)
-  )
+  res <- httr::GET(url = paste0(galaxy_url, "/api/workflows/",
+                                workflow_id), httr::add_headers(`x-api-key` = api_key))
   httr::stop_for_status(res)
-
   wf <- httr::content(res, as = "parsed")
+  main_inputs <- wf$inputs
+  main_inputs <- lapply(names(main_inputs), function(step_id) {
+    step <- main_inputs[[step_id]]
+    data.frame(step_id = step_id, name = step$label %||%
+                 step$name %||% NA_character_, type = step$type %||% NA_character_, optional = isTRUE(step$optional),
+               default = step$value %||% NA_character_,
+               stringsAsFactors = FALSE)
+  })
   steps <- wf$steps
-
   if (length(steps) == 0) {
-    return(data.frame(
-      step_id = character(0),
-      name = character(0),
-      type = character(0),
-      optional = logical(0),
-      default = character(0),
-      stringsAsFactors = FALSE
-    ))
+    return(data.frame(step_id = character(0), name = character(0),
+                      type = character(0), optional = logical(0), default = character(0),
+                      stringsAsFactors = FALSE))
   }
-
   inputs <- lapply(names(steps), function(step_id) {
     step <- steps[[step_id]]
-
-    if (!step$type %in% c("data_input", "parameter_input", "data_collection_input")) {
+    if (!step$type %in% c("data_input", "parameter_input",
+                          "data_collection_input")) {
       return(NULL)
     }
-
-    data.frame(
-      step_id = step_id,
-      name = step$label %||% step$name %||% NA_character_,
-      type = step$type,
-      optional = isTRUE(step$optional),
-      default = step$default_value %||% NA_character_,
-      stringsAsFactors = FALSE
-    )
+    data.frame(step_id = step_id, name = step$label %||%
+                 step$name %||% NA_character_, type = step$type, optional = isTRUE(step$optional),
+               default = step$default_value %||% NA_character_,
+               stringsAsFactors = FALSE)
   })
-
   inputs <- inputs[!sapply(inputs, is.null)]
-
   if (length(inputs) == 0) {
-    return(data.frame(
-      step_id = character(0),
-      name = character(0),
-      type = character(0),
-      optional = logical(0),
-      default = character(0),
-      stringsAsFactors = FALSE
-    ))
+    return(data.frame(step_id = character(0), name = character(0),
+                      type = character(0), optional = logical(0), default = character(0),
+                      stringsAsFactors = FALSE))
   }
-
-  do.call(rbind, inputs)
+  rbind(do.call(rbind, main_inputs),
+        do.call(rbind, inputs))
 }
+
 
 # Helper to trim trailing slash
 .rtrim <- function(x, char = "/") {
