@@ -462,6 +462,9 @@ setMethod("galaxy_upload_https", "Galaxy",
     if (!any(wf_inputs %in% names(args))) {
       args[[wf_inputs[1L]]] <- list(src = "hda", id = dataset_id)
     }
+    if (is.null(args[[wf_inputs[[1]]]])){
+      args[[wf_inputs[1L]]] <- list(src = "hda", id = dataset_id)
+    }
   }
   args
 }

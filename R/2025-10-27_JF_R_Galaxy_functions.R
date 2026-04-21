@@ -167,12 +167,12 @@ galaxy_get_workflow <- function(workflow_id,
 #' }
 #'
 #' @export
-galaxy_get_workflow_inputs2 <- function (workflow_id, galaxy_url = "https://usegalaxy.eu")
+galaxy_get_workflow_inputs <- function (workflow_id, galaxy_url = "https://usegalaxy.eu")
 {
   if (missing(workflow_id) || !nzchar(workflow_id)) {
     stop("workflow_id is required.")
   }
-  galaxy_url <- GalaxyR:::.resolve_galaxy_url(galaxy_url)
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
   api_key <- Sys.getenv("GALAXY_API_KEY")
   if (!nzchar(api_key)) {
     stop("GALAXY_API_KEY environment variable is not set.")
