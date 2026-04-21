@@ -27,13 +27,12 @@ This package is designed for **automation, reproducibility, and scripting**, not
 
 ## Installation
 
-Install this package fron CRAN:
-```
+Install this package from CRAN:
+``` r
 install.packages("GalaxyR")
 ```
 
 Or install the latest version directly from GitHub:
-
 ``` r
 # install.packages("remotes")
 remotes::install_github("JulFrey/GalaxyR")
@@ -55,7 +54,7 @@ galaxy_set_credentials("your-secret-key")
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
 
-```         
+``` r       
 #usethis::edit_r_environ()
 GALAXY_API_KEY = your-secret-key
 ```
@@ -68,8 +67,8 @@ Restart R after editing`.Renviron`.
 
 The default Galaxy instance is:
 
-```         
-https://usegalaxy.eu
+``` r
+"https://usegalaxy.eu"
 ```
 
 Most functions accept a `galaxy_url` argument if you want to target a different Galaxy server.
@@ -87,6 +86,9 @@ Below is a complete example that:
 5.  Downloads and inspects the result
 
 ``` r
+# Load GalaxyR
+library(GalaxyR)
+
 # Get the tool ID and inspect inputs 
 tool <- galaxy_get_tool_id("Add line to file")
 inputs <- galaxy_get_tool(tool)
@@ -97,18 +99,20 @@ test_text <- "This is an example \ntest file."
 writeLines(test_text,test_file)
 
 # directory for outputs
-outdir <- tmp_dir()
+outdir <- tempdir()
 
 # Run on Galaxy
 gxy <- galaxy(history_name = "add line example") |> # S4 class with history name
   galaxy_initialize() |> # initialise Galaxy history
   galaxy_upload_https(test_file) |> # upload test file
   galaxy_run_tool(tool, inputs = list(text_input = "added example text")) |> # run 
-  galaxy_poll_tool() |> # wait for compleation
+  galaxy_poll_tool() |> # wait for completion
   galaxy_download_result(outdir)
 
 # Inspect the result
-readLines(list.files(outdir)[1])
+# Inspect the result
+results <- list.files(outdir, full.names = TRUE)
+readLines(results[grep("Add line to file", results)])
 ```
 
 ------------------------------------------------------------------------
@@ -140,9 +144,7 @@ readLines(list.files(outdir)[1])
 Galaxy jobs and datasets are **asynchronous**.
 
 This package provides helpers to wait safely until execution finishes:
-
--   `galaxy_wait_for_job()` — waits for tool execution
--   `galaxy_wait_for_dataset()` — waits for dataset processing
+`galaxy_poll_tool()` waits for tool execution.
 
 Terminal states: - ✅ `ok` - ❌ `error` - 🗑️ `deleted`
 
@@ -155,7 +157,7 @@ Terminal states: - ✅ `ok` - ❌ `error` - 🗑️ `deleted`
 | `galaxy_initialize()`      | Create a new history       |
 | `galaxy_upload_https()`    | Upload a file via HTTPS    |
 | `galaxy_run_tool()`        | Run a Galaxy tool          |
-| `galaxy_wait_for_job()`    | Wait for job completion    |
+| `galaxy_poll_tool()`       | Wait for tool completion   |
 | `galaxy_download_result()` | Download dataset           |
 | `galaxy_get_tool()`        | Inspect tool metadata      |
 | `galaxy_list_tools()`      | List installed tools       |

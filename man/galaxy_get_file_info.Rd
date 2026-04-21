@@ -16,7 +16,7 @@ If the environment variable \code{GALAXY_URL} is set, it takes precedence.}
 \value{
 A data.frame with one row per dataset and the columns:
 \code{id}, \code{name}, \code{size_bytes}, \code{human_size},
-\code{file_type}, \code{state}, \code{deleted}.
+\code{file_type}, \code{state}, \code{deleted}, \code{stringsAsFactors}.
 }
 \description{
 Retrieves metadata for one or more Galaxy history datasets (HDAs),

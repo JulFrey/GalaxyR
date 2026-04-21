@@ -12,7 +12,7 @@ galaxy_history_size(
 )
 }
 \arguments{
-\item{history_id}{Galaxy history id (required)}
+\item{history_id}{Galaxy history ID.}
 
 \item{galaxy_url}{Character. Base URL of the Galaxy instance
 (for example \code{"https://usegalaxy.eu"}).
