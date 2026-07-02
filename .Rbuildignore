@@ -11,3 +11,5 @@
 ^Dockerfile$
 ^2025-10-27_JF_R_Galaxy\.R$
 ^.*\.cff$
+^\.positai$
+^\.claude$

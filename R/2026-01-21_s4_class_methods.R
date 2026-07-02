@@ -1222,3 +1222,204 @@ setMethod("galaxy_poll_tool", "Galaxy",
           })
 
 
+## Generic for listing files in a history
+#' @rdname galaxy_list_files
+#' @export
+setGeneric(
+  "galaxy_list_files",
+  function(x,
+           include_deleted = FALSE,
+           include_hidden  = FALSE,
+           galaxy_url      = "https://usegalaxy.eu",
+           limit           = 500L) {
+    standardGeneric("galaxy_list_files")
+  },
+  signature = "x"
+)
+
+#' List all files (datasets) in a Galaxy history
+#'
+#' `galaxy_list_files()` is an S4 generic. With `x` as a character scalar,
+#' it is treated as a Galaxy history ID and returns a data frame of history
+#' datasets (files). With `x` as a `Galaxy` object, the history ID and URL
+#' are taken from the object.
+#'
+#' The function queries `/api/histories/{history_id}/contents` using
+#' pagination and returns one row per history content item, restricted to
+#' datasets (`history_content_type == "dataset"` when available).
+#'
+#' @param x A history ID (`character`) or a `Galaxy` object.
+#' @param include_deleted Logical; if `TRUE`, include deleted datasets.
+#'   Default: `FALSE`.
+#' @param include_hidden Logical; if `TRUE`, include hidden datasets.
+#'   Default: `FALSE`.
+#' @param galaxy_url Character. Base URL of the Galaxy instance, used by the
+#'   character method. If `GALAXY_URL` is set, it takes precedence.
+#' @param limit Integer page size for API pagination. Default: `500L`.
+#'
+#' @return A `data.frame` with one row per dataset and columns:
+#' \describe{
+#'   \item{id}{Encoded dataset ID.}
+#'   \item{name}{Dataset name.}
+#'   \item{history_id}{Encoded history ID.}
+#'   \item{history_content_type}{Usually `"dataset"`.}
+#'   \item{type}{Galaxy item type (if provided by server).}
+#'   \item{state}{Dataset state (e.g. `"ok"`, `"running"`, `"error"`).}
+#'   \item{deleted}{Logical deletion flag.}
+#'   \item{hidden}{Logical hidden flag.}
+#'   \item{file_ext}{Datatype extension (if available).}
+#'   \item{file_size}{Dataset size in bytes (if available).}
+#'   \item{create_time}{Creation timestamp (if available).}
+#'   \item{update_time}{Update timestamp (if available).}
+#' }
+#'
+#' If no datasets are found, an empty data frame with these columns is returned.
+#'
+#' @examplesIf galaxy_has_key()
+#' # Character method (history_id)
+#' hid <- galaxy_initialize("List files example")
+#' files_df <- galaxy_list_files(hid)
+#' head(files_df)
+#'
+#' # Galaxy-object method
+#' g <- galaxy(history_name = "List files example")
+#' g <- galaxy_initialize(g)
+#' files_df2 <- galaxy_list_files(g)
+#' head(files_df2)
+#'
+#' @rdname galaxy_list_files
+#' @export
+setMethod(
+  "galaxy_list_files", "character",
+  function(x,
+           include_deleted = FALSE,
+           include_hidden  = FALSE,
+           galaxy_url      = "https://usegalaxy.eu",
+           limit           = 500L) {
+    .galaxy_list_files(
+      history_id       = x,
+      include_deleted  = include_deleted,
+      include_hidden   = include_hidden,
+      galaxy_url       = galaxy_url,
+      limit            = limit
+    )
+  }
+)
+
+#' @rdname galaxy_list_files
+#' @export
+setMethod(
+  "galaxy_list_files", "Galaxy",
+  function(x,
+           include_deleted = FALSE,
+           include_hidden  = FALSE,
+           limit           = 500L) {
+    .galaxy_list_files(
+      history_id       = x@history_id,
+      include_deleted  = include_deleted,
+      include_hidden   = include_hidden,
+      galaxy_url       = x@galaxy_url,
+      limit            = limit
+    )
+  }
+)
+
+#' Helper to list files in a history
+#' @keywords internal
+#' @noRd
+.galaxy_list_files <- function(history_id,
+                               include_deleted = FALSE,
+                               include_hidden  = FALSE,
+                               galaxy_url      = "https://usegalaxy.eu",
+                               limit           = 500L) {
+  if (missing(history_id) || !nzchar(history_id)) {
+    stop("history_id is required.")
+  }
+
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  if (!is.numeric(limit) || length(limit) != 1 || is.na(limit) || limit < 1) {
+    stop("'limit' must be a positive integer.")
+  }
+  limit <- as.integer(limit)
+
+  base_url <- paste0(galaxy_url, "/api/histories/", history_id, "/contents")
+
+  offset <- 0L
+  all_items <- list()
+
+  repeat {
+    res <- httr::GET(
+      url = base_url,
+      httr::add_headers(`x-api-key` = api_key, `Content-Type` = "application/json"),
+      query = list(
+        limit   = limit,
+        offset  = offset,
+        deleted = if (isTRUE(include_deleted)) "true" else "false",
+        visible = if (isTRUE(include_hidden)) "false" else "true"
+      )
+    )
+    httr::stop_for_status(res)
+
+    items <- httr::content(res, as = "parsed", simplifyVector = TRUE)
+
+    if (length(items) == 0 || (is.data.frame(items) && nrow(items) == 0)) break
+
+    if (is.data.frame(items)) {
+      all_items[[length(all_items) + 1L]] <- items
+      n_items <- nrow(items)
+    } else {
+      # fallback if Galaxy/httr returns list-of-lists
+      all_items[[length(all_items) + 1L]] <- as.data.frame(items, stringsAsFactors = FALSE)
+      n_items <- length(items)
+    }
+
+    if (n_items < limit) break
+    offset <- offset + limit
+  }
+
+  empty_df <- data.frame(
+    id = character(0),
+    name = character(0),
+    history_id = character(0),
+    history_content_type = character(0),
+    type = character(0),
+    state = character(0),
+    deleted = logical(0),
+    hidden = logical(0),
+    file_ext = character(0),
+    file_size = numeric(0),
+    create_time = character(0),
+    update_time = character(0),
+    stringsAsFactors = FALSE
+  )
+
+  if (length(all_items) == 0) {
+    return(empty_df)
+  }
+
+  df <- do.call(rbind, all_items)
+
+  # Keep only datasets when field is available
+  if ("history_content_type" %in% names(df)) {
+    df <- df[df$history_content_type == "dataset", , drop = FALSE]
+  }
+
+  # Ensure expected columns exist
+  needed <- c(
+    "id", "name", "history_id", "history_content_type", "type", "state",
+    "deleted", "hidden", "file_ext", "file_size", "create_time", "update_time"
+  )
+  for (nm in setdiff(needed, names(df))) {
+    df[[nm]] <- NA
+  }
+
+  df <- df[, needed, drop = FALSE]
+  rownames(df) <- NULL
+  df
+}
