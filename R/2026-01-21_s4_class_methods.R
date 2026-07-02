@@ -1423,3 +1423,133 @@ setMethod(
   rownames(df) <- NULL
   df
 }
+
+#############################
+## Delete history (S4 style)
+#############################
+
+#' Internal helper to delete a Galaxy history
+#' @keywords internal
+#' @noRd
+.galaxy_delete_history <- function(history_id,
+                                   purge      = FALSE,
+                                   galaxy_url = "https://usegalaxy.eu",
+                                   verbose    = FALSE) {
+  if (missing(history_id) || !nzchar(history_id)) {
+    stop("history_id is required.")
+  }
+
+  galaxy_url <- .resolve_galaxy_url(galaxy_url)
+
+  api_key <- Sys.getenv("GALAXY_API_KEY")
+  if (!nzchar(api_key)) {
+    stop("GALAXY_API_KEY environment variable is not set.")
+  }
+
+  url <- sprintf("%s/api/histories/%s", .rtrim(galaxy_url, "/"), history_id)
+
+  res <- httr::DELETE(
+    url = url,
+    httr::add_headers(`x-api-key` = api_key, `Content-Type` = "application/json"),
+    query = list(purge = isTRUE(purge))
+  )
+
+  status <- httr::status_code(res)
+  content_text <- httr::content(res, as = "text", encoding = "UTF-8")
+
+  if (isTRUE(verbose)) {
+    message(sprintf("DELETE %s?purge=%s -> %s",
+                    url, tolower(as.character(isTRUE(purge))), status))
+  }
+
+  list(
+    success = status >= 200 && status < 300,
+    status  = status,
+    content = content_text
+  )
+}
+
+#' Generic for deleting a Galaxy history
+#' @rdname galaxy_delete_history
+#' @export
+setGeneric(
+  "galaxy_delete_history",
+  function(x,
+           purge      = FALSE,
+           galaxy_url = "https://usegalaxy.eu",
+           verbose    = FALSE) {
+    standardGeneric("galaxy_delete_history")
+  },
+  signature = "x"
+)
+
+#' Delete a Galaxy history
+#'
+#' `galaxy_delete_history()` is an S4 generic. With `x` as a character scalar,
+#' it is treated as a history ID and the function returns API response metadata.
+#' With `x` as a `Galaxy` object, `history_id` and `galaxy_url` are taken from
+#' the object and the object state is updated.
+#'
+#' The function calls `DELETE /api/histories/{history_id}` with optional
+#' `purge=TRUE` to request permanent removal (server policy permitting).
+#'
+#' @param x A history ID (`character`) or a `Galaxy` object.
+#' @param purge Logical. If `TRUE`, request permanent deletion (purge).
+#'   Default: `FALSE`.
+#' @param galaxy_url Character. Base URL of the Galaxy instance, used by the
+#'   character method. If `GALAXY_URL` is set, it takes precedence.
+#' @param verbose Logical. If `TRUE`, print request status. Default: `FALSE`.
+#'
+#' @return
+#' - For the `character` method: a named list with `success`, `status`, `content`.
+#' - For the `Galaxy` method: the modified `Galaxy` object (state set to
+#'   `"success"` on 2xx, otherwise `"error"`).
+#'
+#' @examplesIf galaxy_has_key()
+#' \dontrun{
+#' # Character method
+#' hid <- galaxy_initialize("history to delete")
+#' galaxy_delete_history(hid, purge = FALSE)
+#'
+#' # Galaxy method
+#' g <- galaxy(history_name = "history to delete")
+#' g <- galaxy_initialize(g)
+#' g <- galaxy_delete_history(g, purge = FALSE)
+#' }
+#'
+#' @rdname galaxy_delete_history
+#' @export
+setMethod(
+  "galaxy_delete_history", "character",
+  function(x,
+           purge      = FALSE,
+           galaxy_url = "https://usegalaxy.eu",
+           verbose    = FALSE) {
+    .galaxy_delete_history(
+      history_id = x,
+      purge      = purge,
+      galaxy_url = galaxy_url,
+      verbose    = verbose
+    )
+  }
+)
+
+#' @rdname galaxy_delete_history
+#' @export
+setMethod(
+  "galaxy_delete_history", "Galaxy",
+  function(x,
+           purge   = FALSE,
+           verbose = FALSE) {
+    res <- .galaxy_delete_history(
+      history_id = x@history_id,
+      purge      = purge,
+      galaxy_url = x@galaxy_url,
+      verbose    = verbose
+    )
+
+    x@state <- if (isTRUE(res$success)) "success" else "error"
+    validObject(x)
+    x
+  }
+)
