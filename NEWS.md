@@ -1,3 +1,7 @@
+# GalaxyR 0.1.2
+
+-   Add galaxy_list_files function to list all files from an existing history
+
 # GalaxyR 0.1.1
 
 -   Add support to download full histories i.e. as RO-CRATE by adding the `galaxy_download_rocrate()` function.
