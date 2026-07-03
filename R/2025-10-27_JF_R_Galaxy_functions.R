@@ -827,7 +827,10 @@ galaxy_get_tool <- function(tool_id,
     query = list(tool_version = tool_version, io_details = 'true')
   )
   httr::stop_for_status(res)
-  httr::content(res, as = "parsed", simplifyVector = FALSE)
+  tool_list <- httr::content(res, as = "parsed", simplifyVector = FALSE)
+  message("Tool '", tool_id, "' retrieved successfully. Version: ", tool_list$version)
+  message(galaxy_print_tool_inputs(tool_list))
+  return(tool_list)
 }
 
 #' Retrieve Galaxy tool IDs by name
@@ -995,4 +998,30 @@ galaxy_get_file_info <- function(file_ids,
   })
 
   do.call(rbind, results)
+}
+
+#' Print tool inputs
+#' 
+#' @param inputs A list of tool inputs as returned by \code{galaxy_get_tool}.
+#' 
+#' @return A character vector with formatted input descriptions.
+#' 
+#' @examplesIf galaxy_has_key()
+#' tool_id <- galaxy_get_tool_id("FastQC")[1]
+#' fastqc_tool <- galaxy_get_tool(tool_id)
+#' print_tool_inputs(fastqc_tool)
+#' @export 
+galaxy_print_tool_inputs <- function(inputs) {
+  cbind(sapply(inputs$inputs, function(x) {
+    if(x$type == "select" && !is.null(x$options)){
+      opt <- sapply(x$options, function(x) x[[1]])
+      opt_vals <- sapply(x$options, function(x) x[[2]])
+      opt <- paste(opt, opt_vals, sep = " = ")
+      opt <- paste(1:length(opt), opt, sep = ": ")
+      options_text <- paste0("options: ", paste(opt, collapse = ", "))
+      return(paste(sprintf("%s (%s) [optional: %s] default: %s", x["name"], x["type"], x["optional"], x["default"]), options_text, sep = " | "))
+    } else {
+      return(sprintf("%s (%s) [optional: %s] default: %s", x["name"], x["type"], x["optional"], x["default"]))
+    }
+  }))
 }
