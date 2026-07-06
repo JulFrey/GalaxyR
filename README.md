@@ -13,26 +13,28 @@ This package is designed for **automation, reproducibility, and scripting**, not
 
 ## Features
 
--   🔑 Simple API key management
--   📁 Create and manage Galaxy histories
--   ⬆️ Upload datasets via HTTPS or FTP
--   🔧 Discover and inspect Galaxy tools and workflows
--   ▶️ Run tools and workflow programmatically
--   ⏳ Wait for jobs to finish (robust polling)
--   📥 Download resulting datasets
--   📊 Inspect history size and disk usage
--   🔧 S4-based interface for pipe friendly usage
+- 🔑 Simple API key management
+- 📁 Create and manage Galaxy histories
+- ⬆️ Upload datasets via HTTPS or FTP
+- 🔧 Discover and inspect Galaxy tools and workflows
+- ▶️ Run tools and workflow programmatically
+- ⏳ Wait for jobs to finish (robust polling)
+- 📥 Download resulting datasets
+- 📊 Inspect history size and disk usage
+- 🔧 S4-based interface for pipe friendly usage
 
 ------------------------------------------------------------------------
 
 ## Installation
 
 Install this package from CRAN:
+
 ``` r
 install.packages("GalaxyR")
 ```
 
 Or install the latest version directly from GitHub:
+
 ``` r
 # install.packages("remotes")
 remotes::install_github("JulFrey/GalaxyR")
@@ -49,14 +51,15 @@ You can either:
 ### Option 1: Set it once per session
 
 ``` r
-galaxy_set_credentials("your-secret-key")
+galaxy_set_credentials("your-secret-key", galaxy_url = "https://usegalaxy.eu")
 ```
 
 ### Option 2: Add it to `~/.Renviron` (recommended)
 
-``` r       
+``` r
 #usethis::edit_r_environ()
-GALAXY_API_KEY = your-secret-key
+GALAXY_API_KEY = "your-secret-key"
+GALAXY_URL = "https://usegalaxy.eu"
 ```
 
 Restart R after editing`.Renviron`.
@@ -71,7 +74,7 @@ The default Galaxy instance is:
 "https://usegalaxy.eu"
 ```
 
-Most functions accept a `galaxy_url` argument if you want to target a different Galaxy server.
+The Galaxy Insatance can be specified using the `galaxy_set_credentials()` function or the `.Renviron` file (see above). All functions also accept a `galaxy_url` argument if you want to target a different Galaxy server.
 
 ------------------------------------------------------------------------
 
@@ -119,23 +122,23 @@ readLines(results[grep("Add line to file", results)])
 
 ## Important Notes on Tool Inputs
 
--   **Always use input `name`, not label**\
-    Example: `text_input`, not `"text to add"`
+- **Always use input `name`, not label**\
+  Example: `text_input`, not `"text to add"`
 
--   **Dataset inputs must be passed as objects**, not plain strings:
+- **Dataset inputs must be passed as objects**, not plain strings:
 
-    ``` r
-    infile = list(
-      src = "hda",
-      id  = DATASET_ID
-    )
-    ```
+  ``` r
+  infile = list(
+    src = "hda",
+    id  = DATASET_ID
+  )
+  ```
 
--   You can inspect expected inputs using:
+- You can inspect expected inputs using:
 
-    ``` r
-    galaxy_get_tool(tool_id)
-    ```
+  ``` r
+  galaxy_get_tool(tool_id)
+  ```
 
 ------------------------------------------------------------------------
 
@@ -143,8 +146,7 @@ readLines(results[grep("Add line to file", results)])
 
 Galaxy jobs and datasets are **asynchronous**.
 
-This package provides helpers to wait safely until execution finishes:
-`galaxy_poll_tool()` waits for tool execution.
+This package provides helpers to wait safely until execution finishes: `galaxy_poll_tool()` waits for tool execution.
 
 Terminal states: - ✅ `ok` - ❌ `error` - 🗑️ `deleted`
 
@@ -152,16 +154,20 @@ Terminal states: - ✅ `ok` - ❌ `error` - 🗑️ `deleted`
 
 ## Common Helper Functions
 
-| Function                   | Description                |
-|----------------------------|----------------------------|
-| `galaxy_initialize()`      | Create a new history       |
-| `galaxy_upload_https()`    | Upload a file via HTTPS    |
-| `galaxy_run_tool()`        | Run a Galaxy tool          |
-| `galaxy_poll_tool()`       | Wait for tool completion   |
-| `galaxy_download_result()` | Download dataset           |
-| `galaxy_get_tool()`        | Inspect tool metadata      |
-| `galaxy_list_tools()`      | List installed tools       |
-| `galaxy_history_size()`    | Compute history disk usage |
+| Function | Description |
+|----|----|
+| `galaxy_initialize()` | Create a new history |
+| `galaxy_upload_https()` | Upload a file via HTTPS |
+| `galaxy_run_tool()` | Run a Galaxy tool |
+| `galaxy_poll_tool()` | Wait for tool completion |
+| `galaxy_download_result()` | Download dataset |
+| `galaxy_get_tool()` | Inspect tool metadata |
+| `galaxy_list_tools()` | List installed tools |
+| `galaxy_get_tool()` | Get all tool options and parameters |
+| `galaxy_print_tool_inputs()` | Print a better overview of the inputs for a tool |
+| `galaxy_history_size()` | Compute history disk usage |
+| `galaxy_list_files()` | List all files within a history |
+| `galaxy_delete_history()` | Delets or purges full histories for cleanup |
 
 ------------------------------------------------------------------------
 

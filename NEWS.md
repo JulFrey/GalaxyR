@@ -3,6 +3,7 @@
 -   Add galaxy_list_files function to list all files from an existing history
 -   Add functionality to delete/purge histories
 -   Add print function for tool parameters/options
+-   Add a small reproducible example from genomics
 
 # GalaxyR 0.1.1
 
